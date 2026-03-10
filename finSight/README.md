@@ -1,0 +1,1 @@
+-Ma'am told us to implement 2 types of category (personal & split)
