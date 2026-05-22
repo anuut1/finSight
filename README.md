@@ -1,2 +1,1 @@
-# finSight
-A React-based expense tracking application that helps users manage daily spending by categorizing expenses into personal and split categories. The app provides a simple and user-friendly interface to add, organize, and track expenses efficiently, demonstrating modern React development and component-based design.
+FinSight is a free personal and shared expense management app. Unlike apps that only track personal spending or only split bills, FinSight combines both. It helps users manage income, expenses, budgets, savings goals, and group expenses in one place. It is especially useful for students, roommates, friends, and families who want a free alternative for splitting bills and understanding their real monthly spending.
