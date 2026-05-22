@@ -10,6 +10,9 @@ const transactionSchema = new mongoose.Schema(
     date: { type: Date, required: true },
     tags: [{ type: String }],
     mood: { type: String, enum: ['happy', 'neutral', 'stressed'], default: 'neutral' },
+    source: { type: String, enum: ['manual', 'split'], default: 'manual' },
+    splitGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'SplitGroup' },
+    splitExpenseId: { type: mongoose.Schema.Types.ObjectId },
   },
   { timestamps: true }
 );

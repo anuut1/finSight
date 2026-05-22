@@ -1,4 +1,5 @@
 const Transaction = require('../models/Transaction');
+const mongoose = require('mongoose');
 const { calculateFinancialHealthScore } = require('../utils/financialHealthScore');
 
 const getCurrentMonthRange = () => {
@@ -39,11 +40,12 @@ exports.getSummary = async (req, res) => {
 exports.getCategoryBreakdown = async (req, res) => {
   try {
     const { start, end } = getCurrentMonthRange();
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
     const breakdown = await Transaction.aggregate([
       {
         $match: {
-          userId: req.user.id,
+          userId: userObjectId,
           type: 'expense',
           date: { $gte: start, $lte: end },
         },
@@ -68,8 +70,10 @@ exports.getCategoryBreakdown = async (req, res) => {
 
 exports.getMonthlyTrend = async (req, res) => {
   try {
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
+
     const trend = await Transaction.aggregate([
-      { $match: { userId: req.user.id } },
+      { $match: { userId: userObjectId } },
       {
         $group: {
           _id: { year: { $year: '$date' }, month: { $month: '$date' } },
@@ -166,10 +170,12 @@ exports.getSubscriptions = async (req, res) => {
 
 exports.getSpendingPattern = async (req, res) => {
   try {
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
+
     const pattern = await Transaction.aggregate([
       {
         $match: {
-          userId: req.user.id,
+          userId: userObjectId,
           type: 'expense',
         },
       },

@@ -1,8 +1,131 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import GlassCard from '../components/GlassCard.jsx';
-import BarChartWrapper from '../components/charts/BarChartWrapper.jsx';
-import DonutChartWrapper from '../components/charts/DonutChartWrapper.jsx';
 import api from '../api/axios.js';
+
+const COLORS = ['#4f8ef7', '#00d4aa', '#ff6b6b', '#f9c74f', '#9b5de5', '#48bfe3'];
+const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const money = (value) => `Rs ${Number(value || 0).toFixed(0)}`;
+
+const formatBreakdownLabel = (key) =>
+  key
+    .replace(/Score$/i, '')
+    .replace(/([A-Z])/g, ' $1')
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase());
+
+const gradeCopy = (grade) => {
+  if (grade === 'A') return 'Excellent control. Keep protecting your savings rate.';
+  if (grade === 'B') return 'Healthy overall. Improve the lowest score to move up.';
+  if (grade === 'C') return 'Stable, but budgets or goals need more attention.';
+  if (grade === 'D') return 'Needs attention. Start with one budget category.';
+  return 'Add more income, expenses, budgets, and goals for a useful score.';
+};
+
+const Panel = ({ title, subtitle, action, children, style }) => (
+  <GlassCard style={{ padding: '1rem 1.15rem', ...style }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: '1rem',
+        marginBottom: '0.85rem',
+      }}
+    >
+      <div>
+        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 650 }}>{title}</h2>
+        {subtitle && (
+          <p className="text-muted" style={{ margin: '0.25rem 0 0', fontSize: '0.78rem' }}>
+            {subtitle}
+          </p>
+        )}
+      </div>
+      {action}
+    </div>
+    {children}
+  </GlassCard>
+);
+
+const MetricCard = ({ label, value, helper, tone = 'neutral' }) => {
+  const color =
+    tone === 'good' ? 'var(--accent-teal)' : tone === 'bad' ? 'var(--accent-red)' : '#ffffff';
+
+  return (
+    <GlassCard style={{ padding: '0.95rem 1rem', minHeight: 112 }}>
+      <div className="text-muted" style={{ fontSize: '0.74rem', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+      <div style={{ marginTop: '0.45rem', fontSize: '1.45rem', fontWeight: 700, color }}>
+        {value}
+      </div>
+      <div className="text-muted" style={{ marginTop: '0.35rem', fontSize: '0.78rem' }}>
+        {helper}
+      </div>
+    </GlassCard>
+  );
+};
+
+const EmptyState = ({ children }) => (
+  <div
+    className="text-muted"
+    style={{
+      minHeight: 180,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      fontSize: '0.85rem',
+      border: '1px dashed rgba(255,255,255,0.12)',
+      borderRadius: 12,
+      background: 'rgba(255,255,255,0.025)',
+      padding: '1rem',
+    }}
+  >
+    {children}
+  </div>
+);
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div
+      style={{
+        background: '#050713',
+        border: '1px solid var(--glass-border)',
+        borderRadius: 12,
+        padding: '0.7rem 0.8rem',
+        color: 'var(--text-primary)',
+        boxShadow: 'var(--shadow-soft)',
+      }}
+    >
+      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+        {label}
+      </div>
+      {payload.map((item) => (
+        <div key={item.dataKey || item.name} style={{ fontSize: '0.82rem', color: item.color }}>
+          {item.name || item.dataKey}: {money(item.value)}
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const AnalyticsPage = () => {
   const [health, setHealth] = useState(null);
@@ -19,14 +142,7 @@ const AnalyticsPage = () => {
       setLoading(true);
       setError('');
       try {
-        const [
-          healthRes,
-          trendRes,
-          catRes,
-          patternRes,
-          subRes,
-          txRes,
-        ] = await Promise.all([
+        const [healthRes, trendRes, catRes, patternRes, subRes, txRes] = await Promise.all([
           api.get('/analytics/health-score'),
           api.get('/analytics/monthly-trend'),
           api.get('/analytics/category-breakdown'),
@@ -42,16 +158,15 @@ const AnalyticsPage = () => {
         if (subRes.data?.success) setSubscriptions(subRes.data.data);
 
         if (txRes.data?.success) {
-          const items = txRes.data.data.items || [];
-          const byMood = items.reduce(
-            (acc, t) => {
-              const key = t.mood || 'neutral';
-              if (!acc[key]) acc[key] = 0;
-              acc[key] += t.amount;
+          const byMood = (txRes.data.data.items || []).reduce(
+            (acc, transaction) => {
+              const key = transaction.mood || 'neutral';
+              acc[key] = (acc[key] || 0) + transaction.amount;
               return acc;
             },
             { happy: 0, neutral: 0, stressed: 0 }
           );
+
           setMoodSpending(
             Object.entries(byMood).map(([mood, total]) => ({
               mood: mood.charAt(0).toUpperCase() + mood.slice(1),
@@ -69,275 +184,417 @@ const AnalyticsPage = () => {
     fetchAll();
   }, []);
 
+  const monthlyChartData = useMemo(
+    () =>
+      monthlyTrend
+        .map((item) => ({
+          label: `${item.month}/${String(item.year).slice(-2)}`,
+          sortKey: item.year * 100 + item.month,
+          income: item.income || 0,
+          expense: item.expense || 0,
+          savings: (item.income || 0) - (item.expense || 0),
+        }))
+        .sort((a, b) => a.sortKey - b.sortKey),
+    [monthlyTrend]
+  );
+
+  const categoryData = useMemo(
+    () =>
+      categoryBreakdown
+        .map((item) => ({ category: item.category, total: item.total || 0 }))
+        .sort((a, b) => b.total - a.total),
+    [categoryBreakdown]
+  );
+
+  const categoryTotal = categoryData.reduce((sum, item) => sum + item.total, 0);
+  const topCategory = categoryData[0];
+
+  const spendingPatternData = useMemo(
+    () =>
+      DAY_ORDER.map((day) => ({
+        day: day.slice(0, 3),
+        fullDay: day,
+        total: spendingPattern.find((item) => item.day === day)?.total || 0,
+      })),
+    [spendingPattern]
+  );
+
+  const busiestDay = spendingPatternData.reduce(
+    (max, item) => (item.total > max.total ? item : max),
+    { day: 'None', fullDay: 'None', total: 0 }
+  );
+
+  const moodTotal = moodSpending.reduce((sum, item) => sum + item.total, 0);
+  const highestMood = moodSpending.reduce(
+    (max, item) => (item.total > max.total ? item : max),
+    { mood: 'None', total: 0 }
+  );
+
+  const totalIncome = health?.summary?.totalIncome || 0;
+  const totalExpense = health?.summary?.totalExpense || 0;
+  const netSavings = health?.summary?.savings || 0;
   const healthScore = health?.score ?? 0;
-  const grade = health?.grade ?? '—';
-
-  const monthlyChartData = monthlyTrend
-    .map((t) => ({
-      label: `${t.month}/${String(t.year).slice(-2)}`,
-      income: t.income,
-      expense: t.expense,
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-
-  const categoryData = categoryBreakdown.map((c) => ({
-    category: c.category,
-    total: c.total,
-  }));
-
-  const spendingPatternData = spendingPattern.map((d) => ({
-    day: d.day,
-    total: d.total,
-  }));
+  const grade = health?.grade ?? '-';
+  const scoreTone = healthScore >= 70 ? 'good' : healthScore >= 40 ? 'neutral' : 'bad';
 
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem', paddingTop: '0.25rem' }}>
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '1.25rem',
+          alignItems: 'flex-start',
+          gap: '1rem',
+          flexWrap: 'wrap',
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.6rem' }}>Analytics</h1>
-          <p className="text-muted" style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
-            Your financial health score, patterns, and subscriptions in one view.
+          <h1 style={{ margin: 0, fontSize: '1.65rem' }}>Analytics</h1>
+          <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.86rem' }}>
+            A readable summary of health, trends, categories, moods, and recurring costs.
           </p>
+        </div>
+        <div
+          className="badge badge-positive"
+          style={{ alignSelf: 'center', textTransform: 'none', letterSpacing: 0 }}
+        >
+          Includes split shares synced to personal expenses
         </div>
       </div>
 
       {error && (
         <div
           style={{
-            marginBottom: '0.75rem',
-            padding: '0.6rem 0.9rem',
-            borderRadius: 999,
+            padding: '0.65rem 0.9rem',
+            borderRadius: 12,
             background: 'rgba(255, 107, 107, 0.1)',
             color: 'var(--accent-red)',
-            fontSize: '0.8rem',
+            fontSize: '0.85rem',
           }}
         >
           {error}
         </div>
       )}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1.4fr 1.6fr',
-          gap: '1.25rem',
-          marginBottom: '1.25rem',
-        }}
-      >
-        <GlassCard
-          style={{
-            padding: '1.1rem 1.3rem',
-            display: 'flex',
-            gap: '1.25rem',
-            alignItems: 'center',
-          }}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.9rem' }}>
+        <MetricCard
+          label="Income this month"
+          value={loading ? '-' : money(totalIncome)}
+          helper="All income transactions in the current month"
+          tone="good"
+        />
+        <MetricCard
+          label="Spent this month"
+          value={loading ? '-' : money(totalExpense)}
+          helper="Manual expenses plus synced split shares"
+          tone="bad"
+        />
+        <MetricCard
+          label="Net savings"
+          value={loading ? '-' : money(netSavings)}
+          helper={netSavings >= 0 ? 'Income left after expenses' : 'Expenses are above income'}
+          tone={netSavings >= 0 ? 'good' : 'bad'}
+        />
+        <MetricCard
+          label="Top category"
+          value={topCategory ? topCategory.category : '-'}
+          helper={topCategory ? `${money(topCategory.total)} this month` : 'Add expenses to see this'}
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
+        <Panel
+          title="Financial health"
+          subtitle="A single score from savings, budgets, goals, consistency, and buffer."
+          style={{ minHeight: 350 }}
         >
-          <div
-            style={{
-              width: 140,
-              height: 140,
-              borderRadius: '50%',
-              background:
-                'conic-gradient(from 220deg, var(--accent-red), var(--accent-blue), var(--accent-teal))',
-              position: 'relative',
-              boxShadow: '0 0 40px rgba(0,0,0,0.7)',
-            }}
-          >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'center' }}>
             <div
               style={{
-                position: 'absolute',
-                inset: 10,
+                width: 148,
+                height: 148,
                 borderRadius: '50%',
-                background: 'rgba(5,7,19,0.95)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '2.1rem',
-                  fontWeight: 600,
-                  lineHeight: 1,
-                }}
-              >
-                {loading ? '—' : healthScore}
-              </div>
-              <div
-                style={{
-                  fontSize: '0.8rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.16em',
-                  color: 'var(--text-muted)',
-                  marginTop: '0.2rem',
-                }}
-              >
-                / 100
-              </div>
-              <div
-                style={{
-                  marginTop: '0.4rem',
-                  fontSize: '0.85rem',
-                  color: 'var(--accent-teal)',
-                }}
-              >
-                Grade {grade}
-              </div>
-            </div>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontSize: '0.9rem',
-                marginBottom: '0.5rem',
-              }}
-            >
-              Financial Health Score
-            </div>
-            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 0 }}>
-              Based on savings rate, budget adherence, goal progress, expense stability,
-              and emergency buffer.
-            </p>
-            <div
-              style={{
+                background: `conic-gradient(var(--accent-teal) ${healthScore * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gap: '0.4rem',
-                marginTop: '0.5rem',
-                fontSize: '0.78rem',
+                placeItems: 'center',
+                boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
               }}
             >
-              {health &&
-                Object.entries(health.breakdown || {}).map(([key, value]) => (
-                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="text-muted">
-                      {key
-                        .replace(/Score$/i, '')
-                        .replace(/([A-Z])/g, ' $1')
-                        .trim()}
-                    </span>
-                    <span>{value}</span>
-                  </div>
-                ))}
+              <div
+                style={{
+                  width: 118,
+                  height: 118,
+                  borderRadius: '50%',
+                  background: '#080d1b',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                <div style={{ fontSize: '2rem', fontWeight: 750 }}>
+                  {loading ? '-' : healthScore}
+                </div>
+                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                  out of 100
+                </div>
+                <div style={{ marginTop: '0.25rem', color: 'var(--accent-teal)', fontSize: '0.8rem' }}>
+                  Grade {grade}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  color:
+                    scoreTone === 'good'
+                      ? 'var(--accent-teal)'
+                      : scoreTone === 'bad'
+                      ? 'var(--accent-red)'
+                      : '#f9c74f',
+                  fontWeight: 700,
+                  marginBottom: '0.35rem',
+                }}
+              >
+                {gradeCopy(grade)}
+              </div>
+              <p className="text-muted" style={{ fontSize: '0.82rem', lineHeight: 1.5 }}>
+                Low sub-scores show where to improve first. For example, a low budget score means
+                spending is crossing category limits.
+              </p>
             </div>
           </div>
-        </GlassCard>
 
-        <BarChartWrapper
-          title="Monthly income vs expense trend"
-          data={monthlyChartData}
-          dataKeyX="label"
-          dataKeyY="expense"
-          color="#ff6b6b"
-        />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr', gap: '1.25rem' }}>
-        <DonutChartWrapper
-          title="Category breakdown"
-          data={categoryData}
-          dataKeyName="category"
-          dataKeyValue="total"
-        />
-
-        <BarChartWrapper
-          title="Spending by day of week"
-          data={spendingPatternData}
-          dataKeyX="day"
-          dataKeyY="total"
-          color="#4f8ef7"
-        />
-
-        <GlassCard style={{ padding: '1rem 1.1rem' }}>
-          <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-            Mood vs spending
-          </div>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: '0.8rem',
-            }}
-          >
-            <thead>
-              <tr style={{ color: 'var(--text-muted)' }}>
-                <th style={{ textAlign: 'left', paddingBottom: '0.4rem' }}>Mood</th>
-                <th style={{ textAlign: 'right', paddingBottom: '0.4rem' }}>Total spent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {moodSpending.map((m) => (
-                <tr key={m.mood}>
-                  <td style={{ padding: '0.3rem 0' }}>{m.mood}</td>
-                  <td style={{ padding: '0.3rem 0', textAlign: 'right' }}>
-                    ₹{m.total.toFixed(0)}
-                  </td>
-                </tr>
+          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            {health &&
+              Object.entries(health.breakdown || {}).map(([key, value]) => (
+                <div key={key}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                    <span>{formatBreakdownLabel(key)}</span>
+                    <span className="text-muted">{value}/100</span>
+                  </div>
+                  <div
+                    style={{
+                      height: 7,
+                      marginTop: '0.25rem',
+                      borderRadius: 999,
+                      background: 'rgba(255,255,255,0.08)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${Math.max(0, Math.min(100, value))}%`,
+                        height: '100%',
+                        borderRadius: 999,
+                        background: value >= 70 ? 'var(--accent-teal)' : value >= 40 ? '#f9c74f' : 'var(--accent-red)',
+                      }}
+                    />
+                  </div>
+                </div>
               ))}
-              {moodSpending.length === 0 && (
-                <tr>
-                  <td colSpan="2" className="text-muted" style={{ paddingTop: '0.4rem' }}>
-                    Not enough mood data yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </GlassCard>
+          </div>
+        </Panel>
+
+        <Panel
+          title="Monthly income vs expense"
+          subtitle="Compare how much came in and how much went out across recent months."
+          style={{ minHeight: 350 }}
+        >
+          {monthlyChartData.length === 0 ? (
+            <EmptyState>Add income and expenses to see your monthly trend.</EmptyState>
+          ) : (
+            <ResponsiveContainer width="100%" height={270}>
+              <LineChart data={monthlyChartData} margin={{ top: 10, right: 18, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="label" stroke="var(--text-muted)" tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} tickFormatter={money} width={68} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Line type="monotone" dataKey="income" name="Income" stroke="#00d4aa" strokeWidth={3} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="expense" name="Expense" stroke="#ff6b6b" strokeWidth={3} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </Panel>
       </div>
 
-      <div style={{ marginTop: '1.4rem' }}>
-        <GlassCard style={{ padding: '1rem 1.1rem' }}>
-          <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            Detected subscriptions
-          </div>
-          {loading && (
-            <p className="text-muted" style={{ fontSize: '0.8rem' }}>
-              Analysing recurring expenses...
-            </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
+        <Panel
+          title="Category breakdown"
+          subtitle="Where this month of spending is concentrated."
+          style={{ minHeight: 360 }}
+        >
+          {categoryData.length === 0 ? (
+            <EmptyState>Add expense categories to see a breakdown.</EmptyState>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    dataKey="total"
+                    nameKey="category"
+                    innerRadius={62}
+                    outerRadius={100}
+                    paddingAngle={3}
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={entry.category} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                {categoryData.slice(0, 6).map((item, index) => {
+                  const percent = categoryTotal > 0 ? (item.total / categoryTotal) * 100 : 0;
+                  return (
+                    <div key={item.category}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                        <span>
+                          <span style={{ color: COLORS[index % COLORS.length], marginRight: 6 }}>●</span>
+                          {item.category}
+                        </span>
+                        <span>{money(item.total)}</span>
+                      </div>
+                      <div className="text-muted" style={{ fontSize: '0.74rem', marginTop: '0.1rem' }}>
+                        {percent.toFixed(0)}% of tracked spending
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
-          {!loading && subscriptions.length === 0 && (
-            <p className="text-muted" style={{ fontSize: '0.8rem' }}>
-              No clear recurring subscriptions detected yet.
-            </p>
+        </Panel>
+
+        <Panel
+          title="Mood vs spending"
+          subtitle="See whether certain spending is tied to mood labels."
+          action={
+            highestMood.total > 0 ? (
+              <span className="badge badge-positive" style={{ textTransform: 'none', letterSpacing: 0 }}>
+                Highest: {highestMood.mood}
+              </span>
+            ) : null
+          }
+          style={{ minHeight: 360 }}
+        >
+          {moodTotal === 0 ? (
+            <EmptyState>Add expenses with moods to see this pattern.</EmptyState>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {moodSpending.map((item) => {
+                const percent = moodTotal > 0 ? (item.total / moodTotal) * 100 : 0;
+                const tone =
+                  item.mood === 'Happy'
+                    ? 'var(--accent-teal)'
+                    : item.mood === 'Stressed'
+                    ? 'var(--accent-red)'
+                    : 'var(--accent-blue)';
+
+                return (
+                  <div key={item.mood}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem' }}>
+                      <span>{item.mood}</span>
+                      <strong>{money(item.total)}</strong>
+                    </div>
+                    <div
+                      style={{
+                        height: 9,
+                        marginTop: '0.35rem',
+                        borderRadius: 999,
+                        background: 'rgba(255,255,255,0.08)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div style={{ width: `${percent}%`, height: '100%', borderRadius: 999, background: tone }} />
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '0.74rem', marginTop: '0.2rem' }}>
+                      {percent.toFixed(0)}% of mood-tagged spending
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: '0.75rem',
-              marginTop: '0.5rem',
-            }}
-          >
-            {subscriptions.map((s) => (
-              <GlassCard key={s.description} style={{ padding: '0.7rem 0.8rem' }}>
-                <div style={{ fontSize: '0.9rem', marginBottom: '0.2rem' }}>
-                  {s.description}
-                </div>
-                <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                  Estimated monthly cost{' '}
-                  <span style={{ color: 'var(--accent-blue)' }}>₹{s.estimatedMonthlyCost}</span>
-                </div>
-                <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>
-                  {s.occurrences} similar charges detected
-                </div>
-              </GlassCard>
-            ))}
-          </div>
-        </GlassCard>
+        </Panel>
       </div>
-    </>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
+        <Panel
+          title="Spending by day"
+          subtitle="Which day of the week usually costs the most."
+          action={
+            busiestDay.total > 0 ? (
+              <span className="badge badge-positive" style={{ textTransform: 'none', letterSpacing: 0 }}>
+                Peak: {busiestDay.fullDay}
+              </span>
+            ) : null
+          }
+          style={{ minHeight: 320 }}
+        >
+          {spendingPattern.every((item) => item.total === 0) ? (
+            <EmptyState>Add dated expenses to see day-wise spending.</EmptyState>
+          ) : (
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={spendingPatternData} margin={{ top: 10, right: 18, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="day" stroke="var(--text-muted)" tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} tickFormatter={money} width={68} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="total" name="Spent" fill="#4f8ef7" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Panel>
+
+        <Panel
+          title="Detected subscriptions"
+          subtitle="Repeated similar expenses from the last six months."
+          style={{ minHeight: 320 }}
+        >
+          {loading ? (
+            <EmptyState>Analysing recurring expenses...</EmptyState>
+          ) : subscriptions.length === 0 ? (
+            <EmptyState>No clear recurring subscriptions detected yet.</EmptyState>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+              {subscriptions.map((subscription) => (
+                <div
+                  key={subscription.description}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: '0.75rem 0',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 650 }}>{subscription.description}</div>
+                    <div className="text-muted" style={{ fontSize: '0.76rem', marginTop: '0.15rem' }}>
+                      {subscription.occurrences} similar charges detected
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', color: 'var(--accent-blue)', fontWeight: 700 }}>
+                    {money(subscription.estimatedMonthlyCost)}
+                    <div className="text-muted" style={{ fontSize: '0.72rem', fontWeight: 400 }}>
+                      monthly est.
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+    </div>
   );
 };
 
 export default AnalyticsPage;
-

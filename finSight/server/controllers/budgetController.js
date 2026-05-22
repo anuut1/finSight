@@ -1,5 +1,6 @@
 const Budget = require('../models/Budget');
 const Transaction = require('../models/Transaction');
+const mongoose = require('mongoose');
 
 exports.getBudgets = async (req, res) => {
   try {
@@ -8,6 +9,7 @@ exports.getBudgets = async (req, res) => {
     const year = Number(req.query.year) || now.getFullYear();
 
     const budgets = await Budget.find({ userId: req.user.id, month, year });
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 0, 23, 59, 59);
@@ -15,7 +17,7 @@ exports.getBudgets = async (req, res) => {
     const expenses = await Transaction.aggregate([
       {
         $match: {
-          userId: req.user.id,
+          userId: userObjectId,
           type: 'expense',
           date: { $gte: start, $lte: end },
         },

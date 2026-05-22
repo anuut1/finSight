@@ -1,6 +1,7 @@
 const Transaction = require('../models/Transaction');
 const Budget = require('../models/Budget');
 const Goal = require('../models/Goal');
+const mongoose = require('mongoose');
 
 const calculateVariance = (values) => {
   if (!values.length) return 0;
@@ -11,6 +12,7 @@ const calculateVariance = (values) => {
 };
 
 exports.calculateFinancialHealthScore = async (userId) => {
+  const userObjectId = new mongoose.Types.ObjectId(userId);
   const now = new Date();
   const month = now.getMonth();
   const year = now.getFullYear();
@@ -26,7 +28,7 @@ exports.calculateFinancialHealthScore = async (userId) => {
     Budget.find({ userId, month: month + 1, year }),
     Goal.find({ userId }),
     Transaction.aggregate([
-      { $match: { userId } },
+      { $match: { userId: userObjectId } },
       {
         $group: {
           _id: { year: { $year: '$date' }, month: { $month: '$date' } },

@@ -9,6 +9,7 @@ import TransactionsPage from './pages/TransactionsPage.jsx';
 import BudgetsPage from './pages/BudgetsPage.jsx';
 import GoalsPage from './pages/GoalsPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
+import SplitsPage from './pages/SplitsPage.jsx';
 import './index.css';
 
 function App() {
@@ -65,6 +66,14 @@ function App() {
               element={
                 <Layout>
                   <AnalyticsPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/splits"
+              element={
+                <Layout>
+                  <SplitsPage />
                 </Layout>
               }
             />
