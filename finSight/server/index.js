@@ -18,16 +18,24 @@ const app = express();
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/finsight';
-const allowedOrigins = [
+const allowedOrigins = new Set([
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
   process.env.CLIENT_URL,
-].filter(Boolean);
+].filter(Boolean));
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+  return /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+};
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin(origin, callback) {
+      callback(null, isAllowedOrigin(origin));
+    },
     credentials: true,
   })
 );
