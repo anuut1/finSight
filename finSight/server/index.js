@@ -18,10 +18,16 @@ const app = express();
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/finsight';
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  process.env.CLIENT_URL,
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174','http://localhost:5175'],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
