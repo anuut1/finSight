@@ -53,11 +53,11 @@ const Sidebar = () => {
               borderRadius: 999,
               fontSize: '0.9rem',
               color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-              background: isActive ? 'var(--bg-light)' : 'transparent',
-              border: isActive ? '1px solid rgba(167, 59, 48, 0.4)' : '1px solid transparent',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              background: isActive ? 'var(--bg-secondary)' : 'transparent',
+              border: isActive ? '1px solid rgba(140, 116, 0, 0.35)' : '1px solid transparent',
+              transition: 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
               transform: isActive ? 'translateX(4px)' : 'translateX(0)',
-              boxShadow: isActive ? '0 4px 12px rgba(167, 59, 48, 0.12)' : 'none',
+              boxShadow: isActive ? '0 4px 12px rgba(140, 116, 0, 0.08)' : 'none',
             })}
           >
             <span>{link.label}</span>

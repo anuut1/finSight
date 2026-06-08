@@ -107,7 +107,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   return (
     <div
       style={{
-        background: 'var(--bg-secondary)',
+        background: 'var(--bg-tertiary)',
         border: '1px solid var(--border-color)',
         borderRadius: 12,
         padding: '0.7rem 0.8rem',
