@@ -223,6 +223,7 @@ p {
   padding: 14px 34px;
   letter-spacing: 2px;
   text-transform: uppercase;
+  border-radius: 999px;
   box-shadow: 0 4px 12px rgba(140, 116, 0, 0.15);
 }
 
