@@ -6,7 +6,7 @@ const BarChartWrapper = ({ title, data, dataKeyX, dataKeyY, color }) => {
     <GlassCard style={{ padding: '1rem 1.25rem', height: 260 }}>
       <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>{title}</div>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ left: -10, right: 10 }}>
+        <BarChart data={data} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(156, 145, 159, 0.15)" />
           <XAxis dataKey={dataKeyX} stroke="var(--text-muted)" tickLine={false} axisLine={false} style={{ fontSize: '0.78rem' }} />
           <YAxis 
@@ -14,6 +14,7 @@ const BarChartWrapper = ({ title, data, dataKeyX, dataKeyY, color }) => {
             tickLine={false} 
             axisLine={false} 
             style={{ fontSize: '0.78rem' }}
+            width={75}
             tickFormatter={(val) => `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
           />
           <Tooltip
