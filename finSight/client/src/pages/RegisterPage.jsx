@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import useAuth from '../hooks/useAuth';
+import '../styles/login.css';
 
 const RegisterPage = () => {
   const { login } = useAuth();
@@ -41,22 +42,8 @@ const RegisterPage = () => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1.5rem',
-      }}
-    >
-      <div
-        className="glass-card"
-        style={{
-          width: 'min(460px, 100%)',
-          padding: '1.75rem 1.8rem',
-        }}
-      >
+    <div className="register-container">
+      <div className="login-form-container" style={{ maxWidth: 460 }}>
         <div style={{ marginBottom: '1.25rem' }}>
           <div
             style={{

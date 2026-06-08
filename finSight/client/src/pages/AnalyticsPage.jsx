@@ -17,10 +17,10 @@ import {
 import GlassCard from '../components/GlassCard.jsx';
 import api from '../api/axios.js';
 
-const COLORS = ['#4f8ef7', '#00d4aa', '#ff6b6b', '#f9c74f', '#9b5de5', '#48bfe3'];
+const COLORS = ['#242548', '#525577', '#9C919F', '#C3AAA4'];
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const money = (value) => `Rs ${Number(value || 0).toFixed(0)}`;
+const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
 const formatBreakdownLabel = (key) =>
   key
@@ -107,11 +107,11 @@ const CustomTooltip = ({ active, payload, label }) => {
   return (
     <div
       style={{
-        background: 'var(--bg-tertiary)',
+        background: 'var(--accent-primary)',
         border: '1px solid var(--border-color)',
-        borderRadius: 12,
+        borderRadius: 'var(--radius-md)',
         padding: '0.7rem 0.8rem',
-        color: 'var(--text-primary)',
+        color: 'var(--bg-primary)',
         boxShadow: 'var(--shadow-md)',
       }}
     >
@@ -119,7 +119,8 @@ const CustomTooltip = ({ active, payload, label }) => {
         {label}
       </div>
       {payload.map((item) => (
-        <div key={item.dataKey || item.name} style={{ fontSize: '0.82rem', color: item.color }}>
+        <div key={item.dataKey || item.name} style={{ fontSize: '0.82rem', color: 'var(--bg-primary)' }}>
+          <span style={{ color: item.color, marginRight: 6 }}>●</span>
           {item.name || item.dataKey}: {money(item.value)}
         </div>
       ))}
@@ -314,10 +315,10 @@ const AnalyticsPage = () => {
                 width: 148,
                 height: 148,
                 borderRadius: '50%',
-                background: `conic-gradient(var(--accent-teal) ${healthScore * 3.6}deg, var(--chart-track-color, rgba(255,255,255,0.08)) 0deg)`,
+                background: `conic-gradient(var(--accent-teal) ${healthScore * 3.6}deg, var(--chart-track-color, rgba(156, 145, 159, 0.15)) 0deg)`,
                 display: 'grid',
                 placeItems: 'center',
-                boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+                boxShadow: 'var(--shadow-md)',
               }}
             >
               <div
@@ -325,12 +326,12 @@ const AnalyticsPage = () => {
                   width: 118,
                   height: 118,
                   borderRadius: '50%',
-                  background: 'var(--chart-center-bg, #0b0f19)',
+                  background: 'var(--chart-center-bg, #E5DDD8)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+                  border: '1px solid var(--border-color, rgba(156, 145, 159, 0.15))',
                 }}
               >
                 <div style={{ fontSize: '2rem', fontWeight: 750, color: 'var(--text-primary)' }}>
@@ -380,7 +381,7 @@ const AnalyticsPage = () => {
                       height: 7,
                       marginTop: '0.25rem',
                       borderRadius: 999,
-                      background: 'var(--chart-track-color, rgba(255,255,255,0.08))',
+                      background: 'var(--chart-track-color, rgba(156, 145, 159, 0.15))',
                       overflow: 'hidden',
                     }}
                   >
@@ -408,13 +409,13 @@ const AnalyticsPage = () => {
           ) : (
             <ResponsiveContainer width="100%" height={270}>
               <LineChart data={monthlyChartData} margin={{ top: 10, right: 18, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(156, 145, 159, 0.15)" />
                 <XAxis dataKey="label" stroke="var(--text-muted)" tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} tickFormatter={money} width={68} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Line type="monotone" dataKey="income" name="Income" stroke="#00d4aa" strokeWidth={3} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="expense" name="Expense" stroke="#ff6b6b" strokeWidth={3} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="income" name="Income" stroke="#242548" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
+                <Line type="monotone" dataKey="expense" name="Expense" stroke="#C3AAA4" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -508,7 +509,7 @@ const AnalyticsPage = () => {
                         height: 9,
                         marginTop: '0.35rem',
                         borderRadius: 999,
-                        background: 'rgba(255,255,255,0.08)',
+                        background: 'rgba(156, 145, 159, 0.15)',
                         overflow: 'hidden',
                       }}
                     >
@@ -543,11 +544,11 @@ const AnalyticsPage = () => {
           ) : (
             <ResponsiveContainer width="100%" height={230}>
               <BarChart data={spendingPatternData} margin={{ top: 10, right: 18, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(156, 145, 159, 0.15)" />
                 <XAxis dataKey="day" stroke="var(--text-muted)" tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} tickFormatter={money} width={68} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="total" name="Spent" fill="#4f8ef7" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="total" name="Spent" fill="var(--accent-primary)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -572,7 +573,7 @@ const AnalyticsPage = () => {
                     justifyContent: 'space-between',
                     gap: '1rem',
                     padding: '0.75rem 0',
-                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    borderBottom: '1px solid var(--divider-color)',
                   }}
                 >
                   <div>

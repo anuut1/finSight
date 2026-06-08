@@ -28,6 +28,9 @@ const Sidebar = () => {
           display: 'flex',
           flexDirection: 'column',
           gap: '0.5rem',
+          background: 'var(--bg-primary)', /* Warm Ivory background */
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)',
         }}
       >
         <div
@@ -37,6 +40,7 @@ const Sidebar = () => {
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
             marginBottom: '0.3rem',
+            fontWeight: 600,
           }}
         >
           Overview
@@ -45,19 +49,21 @@ const Sidebar = () => {
           <NavLink
             key={link.to}
             to={link.to}
+            className="sidebar-link"
             style={({ isActive }) => ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '0.55rem 0.75rem',
-              borderRadius: 999,
+              borderRadius: '999px',
               fontSize: '0.9rem',
-              color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-              background: isActive ? 'var(--bg-secondary)' : 'transparent',
-              border: isActive ? '1px solid rgba(140, 116, 0, 0.35)' : '1px solid transparent',
-              transition: 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
+              color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+              background: isActive ? 'var(--accent-secondary)' : 'transparent', /* Soft Blush background */
+              border: isActive ? '1px solid rgba(36, 37, 72, 0.05)' : '1px solid transparent',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               transform: isActive ? 'translateX(4px)' : 'translateX(0)',
-              boxShadow: isActive ? '0 4px 12px rgba(140, 116, 0, 0.08)' : 'none',
+              boxShadow: isActive ? 'var(--shadow-xs)' : 'none',
+              fontWeight: isActive ? 600 : 500,
             })}
           >
             <span>{link.label}</span>

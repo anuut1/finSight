@@ -6,7 +6,7 @@ const Navbar = () => {
   return (
     <header
       style={{
-        padding: '1rem 2rem 0.75rem',
+        padding: '0.5rem 2rem 0.35rem',
         position: 'sticky',
         top: 0,
         zIndex: 20,
@@ -18,40 +18,40 @@ const Navbar = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0.85rem 1.5rem',
+          padding: '0.55rem 1.25rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: 8,
+              width: 26,
+              height: 26,
+              borderRadius: 6,
               background:
-                'conic-gradient(from 200deg, var(--accent-blue), var(--accent-teal), var(--accent-blue))',
-              boxShadow: '0 0 20px rgba(79,142,247,0.65)',
+                'conic-gradient(from 200deg, var(--accent-primary-light), var(--accent-secondary), var(--accent-primary-light))',
+              boxShadow: '0 2px 10px rgba(82, 85, 119, 0.2)',
             }}
           />
           <div>
-            <div style={{ fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.75rem' }}>
+            <div style={{ fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.72rem', color: 'var(--text-primary)' }}>
               FINSIGHT
             </div>
-            <div className="text-muted" style={{ fontSize: '0.8rem' }}>
+            <div className="text-muted" style={{ fontSize: '0.74rem' }}>
               Personal finance, clearly visualised
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-primary)' }}>
               {user?.name || 'Guest'}
             </div>
-            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+            <div className="text-muted" style={{ fontSize: '0.72rem' }}>
               {user?.email}
             </div>
           </div>
-          <button className="btn-primary" type="button" onClick={logout}>
+          <button className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.75rem', letterSpacing: '0.04em' }} type="button" onClick={logout}>
             Sign out
           </button>
         </div>
