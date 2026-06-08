@@ -64,7 +64,7 @@ const Panel = ({ title, subtitle, action, children, style }) => (
 
 const MetricCard = ({ label, value, helper, tone = 'neutral' }) => {
   const color =
-    tone === 'good' ? 'var(--accent-teal)' : tone === 'bad' ? 'var(--accent-red)' : '#ffffff';
+    tone === 'good' ? 'var(--accent-teal)' : tone === 'bad' ? 'var(--accent-red)' : 'var(--text-primary)';
 
   return (
     <GlassCard style={{ padding: '0.95rem 1rem', minHeight: 112 }}>
@@ -91,9 +91,9 @@ const EmptyState = ({ children }) => (
       justifyContent: 'center',
       textAlign: 'center',
       fontSize: '0.85rem',
-      border: '1px dashed rgba(255,255,255,0.12)',
+      border: '1px dashed var(--border-color)',
       borderRadius: 12,
-      background: 'rgba(255,255,255,0.025)',
+      background: 'var(--bg-light)',
       padding: '1rem',
     }}
   >
@@ -107,12 +107,12 @@ const CustomTooltip = ({ active, payload, label }) => {
   return (
     <div
       style={{
-        background: '#050713',
-        border: '1px solid var(--glass-border)',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
         borderRadius: 12,
         padding: '0.7rem 0.8rem',
         color: 'var(--text-primary)',
-        boxShadow: 'var(--shadow-soft)',
+        boxShadow: 'var(--shadow-md)',
       }}
     >
       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
@@ -314,7 +314,7 @@ const AnalyticsPage = () => {
                 width: 148,
                 height: 148,
                 borderRadius: '50%',
-                background: `conic-gradient(var(--accent-teal) ${healthScore * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
+                background: `conic-gradient(var(--accent-teal) ${healthScore * 3.6}deg, var(--chart-track-color, rgba(255,255,255,0.08)) 0deg)`,
                 display: 'grid',
                 placeItems: 'center',
                 boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
@@ -325,15 +325,15 @@ const AnalyticsPage = () => {
                   width: 118,
                   height: 118,
                   borderRadius: '50%',
-                  background: '#080d1b',
+                  background: 'var(--chart-center-bg, #0b0f19)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
                 }}
               >
-                <div style={{ fontSize: '2rem', fontWeight: 750 }}>
+                <div style={{ fontSize: '2rem', fontWeight: 750, color: 'var(--text-primary)' }}>
                   {loading ? '-' : healthScore}
                 </div>
                 <div className="text-muted" style={{ fontSize: '0.75rem' }}>
@@ -353,7 +353,7 @@ const AnalyticsPage = () => {
                       ? 'var(--accent-teal)'
                       : scoreTone === 'bad'
                       ? 'var(--accent-red)'
-                      : '#f9c74f',
+                      : 'var(--accent-warning)',
                   fontWeight: 700,
                   marginBottom: '0.35rem',
                 }}
@@ -380,7 +380,7 @@ const AnalyticsPage = () => {
                       height: 7,
                       marginTop: '0.25rem',
                       borderRadius: 999,
-                      background: 'rgba(255,255,255,0.08)',
+                      background: 'var(--chart-track-color, rgba(255,255,255,0.08))',
                       overflow: 'hidden',
                     }}
                   >
@@ -389,7 +389,7 @@ const AnalyticsPage = () => {
                         width: `${Math.max(0, Math.min(100, value))}%`,
                         height: '100%',
                         borderRadius: 999,
-                        background: value >= 70 ? 'var(--accent-teal)' : value >= 40 ? '#f9c74f' : 'var(--accent-red)',
+                        background: value >= 70 ? 'var(--accent-teal)' : value >= 40 ? 'var(--accent-warning)' : 'var(--accent-red)',
                       }}
                     />
                   </div>

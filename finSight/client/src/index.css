@@ -1,47 +1,56 @@
 :root {
   /* ==================== BACKGROUND COLORS ==================== */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --bg-hover: #e2e8f0;
-  --bg-light: #f0f9ff;
+  --bg-primary: #0a0d16;        /* Deep midnight/slate blue */
+  --bg-secondary: #111524;      /* Slightly lighter card background */
+  --bg-tertiary: #191f35;       /* Hover states and details */
+  --bg-hover: #212845;          /* Selection / Active state */
+  --bg-light: rgba(99, 102, 241, 0.08); /* Soft glass glow background */
   
   /* ==================== ACCENT COLORS - BRIGHT & ENGAGING ==================== */
-  --accent-primary: #3b82f6;      /* Bright Blue */
-  --accent-primary-light: #60a5fa;
-  --accent-primary-dark: #1d4ed8;
-  --accent-secondary: #8b5cf6;    /* Vibrant Purple */
-  --accent-tertiary: #06b6d4;     /* Cyan */
+  --accent-primary: #6366f1;      /* Premium Indigo */
+  --accent-primary-light: #818cf8;
+  --accent-primary-dark: #4f46e5;
+  --accent-secondary: #a855f7;    /* Violet */
+  --accent-tertiary: #14b8a6;     /* Teal */
   --accent-success: #10b981;      /* Emerald */
   --accent-warning: #f59e0b;      /* Amber */
-  --accent-danger: #ef4444;       /* Red */
+  --accent-danger: #f43f5e;       /* Rose/Red */
   
+  /* ==================== COMPONENT COLOR FALLBACKS ==================== */
+  --accent-blue: #3b82f6;
+  --accent-teal: #10b981;
+  --accent-red: #f43f5e;
+
   /* ==================== SEMANTIC COLORS ==================== */
-  --color-income: #059669;
-  --color-expense: #dc2626;
-  --color-neutral: #7c3aed;
+  --color-income: #10b981;
+  --color-expense: #f43f5e;
+  --color-neutral: #6366f1;
   
   /* ==================== TEXT COLORS ==================== */
-  --text-primary: #1e293b;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-disabled: #cbd5e1;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --text-disabled: #475569;
   
   /* ==================== BORDER & DIVIDER ==================== */
-  --border-color: #e2e8f0;
-  --divider-color: #f1f5f9;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --divider-color: rgba(255, 255, 255, 0.04);
   
-  /* ==================== SHADOWS - ELEVATED ==================== */
-  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.1);
-  --shadow-md: 0 4px 12px 0 rgba(15, 23, 42, 0.1);
-  --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.15);
-  --shadow-xl: 0 20px 40px -10px rgba(15, 23, 42, 0.2);
-  --shadow-2xl: 0 30px 60px -15px rgba(15, 23, 42, 0.3);
+  /* ==================== CHART CENTER & TRACK COLORS ==================== */
+  --chart-center-bg: #111524;
+  --chart-track-color: rgba(255, 255, 255, 0.06);
+
+  /* ==================== SHADOWS - GLOWING SHADOWS ==================== */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(99, 102, 241, 0.15);
+  --shadow-xl: 0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(99, 102, 241, 0.2);
+  --shadow-2xl: 0 30px 60px -12px rgba(0, 0, 0, 0.7);
   
   /* ==================== GRADIENTS ==================== */
-  --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  --gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  --gradient-secondary: linear-gradient(135deg, #14b8a6 0%, #6366f1 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
   
   /* ==================== BORDER RADIUS ==================== */
@@ -161,18 +170,20 @@ p {
 
 /* ==================== GLASS CARD ==================== */
 .glass-card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(226, 232, 240, 0.6);
+  background: var(--glass-bg, rgba(17, 21, 36, 0.75));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--glass-shadow, 0 8px 32px 0 rgba(0, 0, 0, 0.37));
   padding: var(--spacing-md);
-  transition: all var(--transition-base);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
-  border-color: rgba(59, 130, 246, 0.2);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.25);
+  box-shadow: var(--shadow-lg), 0 8px 30px rgba(99, 102, 241, 0.1);
+  transform: translateY(-4px);
 }
 
 /* ==================== BUTTONS ==================== */
@@ -187,7 +198,7 @@ p {
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.025em;
-  transition: all var(--transition-fast);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
@@ -203,23 +214,24 @@ p {
 .btn-primary {
   background: var(--gradient-primary);
   color: #ffffff;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
   font-weight: 700;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-  box-shadow: 0 6px 25px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
   transform: translateY(-2px);
+  filter: brightness(1.1);
 }
 
 .btn-primary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+  filter: brightness(0.95);
 }
 
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -232,8 +244,12 @@ p {
 .btn-secondary:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  transform: translateY(-1px);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-outline {
@@ -243,30 +259,30 @@ p {
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.08);
-  transform: translateY(-1px);
+  background: rgba(99, 102, 241, 0.1);
+  transform: translateY(-2px);
 }
 
 .btn-success {
   background: var(--gradient-success);
   color: #ffffff;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
 }
 
 .btn-success:hover:not(:disabled) {
-  box-shadow: 0 6px 25px rgba(16, 185, 129, 0.5);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
   transform: translateY(-2px);
 }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(244, 63, 94, 0.1);
   color: var(--accent-danger);
   border: 2px solid var(--accent-danger);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.15);
-  transform: translateY(-1px);
+  background: rgba(244, 63, 94, 0.18);
+  transform: translateY(-2px);
 }
 
 .btn-sm {

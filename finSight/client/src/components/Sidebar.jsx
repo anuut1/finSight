@@ -52,11 +52,12 @@ const Sidebar = () => {
               padding: '0.55rem 0.75rem',
               borderRadius: 999,
               fontSize: '0.9rem',
-              color: isActive ? '#ffffff' : 'var(--text-muted)',
-              background: isActive ? 'rgba(79, 142, 247, 0.25)' : 'transparent',
-              border: isActive ? '1px solid rgba(79,142,247,0.6)' : '1px solid transparent',
-              transition: 'background 0.15s ease, transform 0.12s ease, border 0.15s ease',
-              transform: isActive ? 'translateX(2px)' : 'translateX(0)',
+              color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+              background: isActive ? 'var(--bg-light)' : 'transparent',
+              border: isActive ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: isActive ? 'translateX(4px)' : 'translateX(0)',
+              boxShadow: isActive ? '0 4px 12px rgba(99, 102, 241, 0.1)' : 'none',
             })}
           >
             <span>{link.label}</span>
