@@ -54,10 +54,10 @@ const Sidebar = () => {
               fontSize: '0.9rem',
               color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
               background: isActive ? 'var(--bg-light)' : 'transparent',
-              border: isActive ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
+              border: isActive ? '1px solid rgba(167, 59, 48, 0.4)' : '1px solid transparent',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               transform: isActive ? 'translateX(4px)' : 'translateX(0)',
-              boxShadow: isActive ? '0 4px 12px rgba(99, 102, 241, 0.1)' : 'none',
+              boxShadow: isActive ? '0 4px 12px rgba(167, 59, 48, 0.12)' : 'none',
             })}
           >
             <span>{link.label}</span>

@@ -1,57 +1,57 @@
 :root {
   /* ==================== BACKGROUND COLORS ==================== */
-  --bg-primary: #0a0d16;        /* Deep midnight/slate blue */
-  --bg-secondary: #111524;      /* Slightly lighter card background */
-  --bg-tertiary: #191f35;       /* Hover states and details */
-  --bg-hover: #212845;          /* Selection / Active state */
-  --bg-light: rgba(99, 102, 241, 0.08); /* Soft glass glow background */
+  --bg-primary: #120a09;        /* Deep midnight clay/terracotta */
+  --bg-secondary: #1c1211;      /* Warm brown card background */
+  --bg-tertiary: #261a19;       /* Hover states and details */
+  --bg-hover: #332321;          /* Active selection highlight */
+  --bg-light: rgba(167, 59, 48, 0.12); /* Soft terracotta glow background */
   
-  /* ==================== ACCENT COLORS - BRIGHT & ENGAGING ==================== */
-  --accent-primary: #6366f1;      /* Premium Indigo */
-  --accent-primary-light: #818cf8;
-  --accent-primary-dark: #4f46e5;
-  --accent-secondary: #a855f7;    /* Violet */
-  --accent-tertiary: #14b8a6;     /* Teal */
-  --accent-success: #10b981;      /* Emerald */
-  --accent-warning: #f59e0b;      /* Amber */
-  --accent-danger: #f43f5e;       /* Rose/Red */
+  /* ==================== ACCENT COLORS - CHIC & SOPHISTICATED ==================== */
+  --accent-primary: #a73b30;      /* Warm Terracotta / Clay Burgundy */
+  --accent-primary-light: #c05449;
+  --accent-primary-dark: #862c23;
+  --accent-secondary: #e8c582;    /* Muted Gold / Sand Cream */
+  --accent-tertiary: #5c6f68;     /* Sage Green - subtle counterpoint */
+  --accent-success: #52796f;      /* Soft Olive Green */
+  --accent-warning: #e09f67;      /* Warm Amber / Ochre */
+  --accent-danger: #bd3b3b;       /* Muted Crimson */
   
   /* ==================== COMPONENT COLOR FALLBACKS ==================== */
-  --accent-blue: #3b82f6;
-  --accent-teal: #10b981;
-  --accent-red: #f43f5e;
+  --accent-blue: #a73b30;         /* Map blue to terracotta */
+  --accent-teal: #52796f;         /* Map teal to olive green */
+  --accent-red: #bd3b3b;          /* Map red to crimson */
 
   /* ==================== SEMANTIC COLORS ==================== */
-  --color-income: #10b981;
-  --color-expense: #f43f5e;
-  --color-neutral: #6366f1;
+  --color-income: #52796f;
+  --color-expense: #bd3b3b;
+  --color-neutral: #e8c582;
   
   /* ==================== TEXT COLORS ==================== */
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #64748b;
-  --text-disabled: #475569;
+  --text-primary: #f7f4eb;        /* Soft sand cream */
+  --text-secondary: #ded9cd;      /* Warm muted sand */
+  --text-muted: #8b8075;          /* Sandy grey */
+  --text-disabled: #5a5149;
   
   /* ==================== BORDER & DIVIDER ==================== */
-  --border-color: rgba(255, 255, 255, 0.08);
-  --divider-color: rgba(255, 255, 255, 0.04);
+  --border-color: rgba(232, 197, 130, 0.12); /* Subtle sand borders */
+  --divider-color: rgba(232, 197, 130, 0.06);
   
   /* ==================== CHART CENTER & TRACK COLORS ==================== */
-  --chart-center-bg: #111524;
-  --chart-track-color: rgba(255, 255, 255, 0.06);
+  --chart-center-bg: #1c1211;
+  --chart-track-color: rgba(232, 197, 130, 0.08);
 
-  /* ==================== SHADOWS - GLOWING SHADOWS ==================== */
+  /* ==================== SHADOWS - WARM SHADOWS ==================== */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 2px 4px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(99, 102, 241, 0.15);
-  --shadow-xl: 0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(99, 102, 241, 0.2);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(167, 59, 48, 0.15);
+  --shadow-xl: 0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(167, 59, 48, 0.2);
   --shadow-2xl: 0 30px 60px -12px rgba(0, 0, 0, 0.7);
   
   /* ==================== GRADIENTS ==================== */
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-  --gradient-secondary: linear-gradient(135deg, #14b8a6 0%, #6366f1 100%);
-  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-primary: linear-gradient(135deg, #a73b30 0%, #e8c582 100%); /* Terracotta to Sand Gold */
+  --gradient-secondary: linear-gradient(135deg, #5c6f68 0%, #e8c582 100%);
+  --gradient-success: linear-gradient(135deg, #52796f 0%, #354f52 100%);
   
   /* ==================== BORDER RADIUS ==================== */
   --radius-xs: 4px;
@@ -170,19 +170,19 @@ p {
 
 /* ==================== GLASS CARD ==================== */
 .glass-card {
-  background: var(--glass-bg, rgba(17, 21, 36, 0.75));
+  background: var(--glass-bg, rgba(28, 18, 17, 0.75));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--glass-border, rgba(232, 197, 130, 0.12));
   border-radius: var(--radius-xl);
-  box-shadow: var(--glass-shadow, 0 8px 32px 0 rgba(0, 0, 0, 0.37));
+  box-shadow: var(--glass-shadow, 0 8px 32px 0 rgba(0, 0, 0, 0.5));
   padding: var(--spacing-md);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.25);
-  box-shadow: var(--shadow-lg), 0 8px 30px rgba(99, 102, 241, 0.1);
+  border-color: rgba(167, 59, 48, 0.3);
+  box-shadow: var(--shadow-lg), 0 8px 30px rgba(167, 59, 48, 0.12);
   transform: translateY(-4px);
 }
 
@@ -192,12 +192,12 @@ p {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius-lg);
+  padding: 0.75rem 1.75rem;
+  border-radius: var(--radius-full);
   border: none;
   font-size: 0.95rem;
   font-weight: 600;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.04em;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   white-space: nowrap;
@@ -213,20 +213,20 @@ p {
 /* ==================== BUTTON VARIANTS ==================== */
 .btn-primary {
   background: var(--gradient-primary);
-  color: #ffffff;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  color: #120a09;                  /* Dark clay text for high contrast on warm sand */
+  box-shadow: 0 4px 14px rgba(167, 59, 48, 0.35);
   font-weight: 700;
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 6px 20px rgba(167, 59, 48, 0.55);
   transform: translateY(-2px);
-  filter: brightness(1.1);
+  filter: brightness(1.08);
 }
 
 .btn-primary:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 2px 8px rgba(167, 59, 48, 0.25);
   filter: brightness(0.95);
 }
 
@@ -239,6 +239,7 @@ p {
   background: var(--bg-tertiary);
   color: var(--text-primary);
   border: 2px solid var(--border-color);
+  border-radius: var(--radius-full);
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -256,28 +257,31 @@ p {
   background: transparent;
   color: var(--accent-primary);
   border: 2px solid var(--accent-primary);
+  border-radius: var(--radius-full);
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(167, 59, 48, 0.1);
   transform: translateY(-2px);
 }
 
 .btn-success {
   background: var(--gradient-success);
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 14px rgba(82, 121, 111, 0.3);
+  border-radius: var(--radius-full);
 }
 
 .btn-success:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+  box-shadow: 0 6px 20px rgba(82, 121, 111, 0.45);
   transform: translateY(-2px);
 }
 
 .btn-danger {
-  background: rgba(244, 63, 94, 0.1);
+  background: rgba(189, 59, 59, 0.1);
   color: var(--accent-danger);
   border: 2px solid var(--accent-danger);
+  border-radius: var(--radius-full);
 }
 
 .btn-danger:hover:not(:disabled) {
