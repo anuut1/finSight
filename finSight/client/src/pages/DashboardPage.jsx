@@ -1,7 +1,6 @@
 import useFetch from '../hooks/useFetch.js';
 import GlassCard from '../components/GlassCard.jsx';
 import StatCard from '../components/StatCard.jsx';
-import DonutChartWrapper from '../components/charts/DonutChartWrapper.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
@@ -10,8 +9,6 @@ import { useState } from 'react';
 
 const DashboardPage = () => {
   const { data: summary, loading: loadingSummary } = useFetch('/analytics/summary', {}, []);
-  const { data: categories } = useFetch('/analytics/category-breakdown', {}, []);
-  const { data: health, loading: loadingHealth } = useFetch('/analytics/health-score', {}, null);
   const { data: budgets } = useFetch('/budgets', {}, []);
   const { data: goals } = useFetch('/goals', {}, []);
   const { data: txData, loading: loadingTx, error: errorTx, setData: setTxData } = useFetch(
@@ -43,30 +40,15 @@ const DashboardPage = () => {
   };
 
   const summaryLoading = loadingSummary;
-
-  const totalIncome = summary?.totalIncome ?? 0;
-  const totalExpense = summary?.totalExpense ?? 0;
   const netSavings = summary?.netSavings ?? 0;
 
-  const catData =
-    categories?.map((c) => ({
-      category: c.category,
-      total: c.total,
-    })) ?? [];
-
-  // Fallbacks for budgets and goals if none are configured in database yet
+  // Fallbacks for budgets if none are configured in database yet
   const displayBudgets = budgets && budgets.length > 0 ? budgets.slice(0, 2) : [
     { category: 'Groceries', limit: 5000, spent: 3200 },
     { category: 'Entertainment', limit: 2000, spent: 1500 }
   ];
 
-  const displayGoals = goals && goals.length > 0 ? goals.slice(0, 2) : [
-    { title: 'Emergency Fund', targetAmount: 100000, savedAmount: 45000 },
-    { title: 'Europe Trip', targetAmount: 150000, savedAmount: 80000 }
-  ];
-
-  const healthScore = health?.score ?? 78;
-  const grade = health?.grade ?? 'B';
+  const displayGoals = goals && goals.length > 0 ? goals : [];
 
   const getDynamicDate = (daysFromNow) => {
     const date = new Date();
@@ -103,64 +85,20 @@ const DashboardPage = () => {
         </button>
       </div>
 
-      {/* Top Cards Row */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-          gap: '1rem',
-          marginBottom: '1.25rem',
-        }}
-      >
+      {/* Top Card Row - Shows ONLY Money Left */}
+      <div style={{ marginBottom: '1.25rem', maxWidth: '340px' }}>
         <StatCard
-          label="Total income"
-          value={summaryLoading ? '...' : `₹${totalIncome.toFixed(0)}`}
-          tone="positive"
-          subtitle="Current month"
-        />
-        <StatCard
-          label="Total expenses"
-          value={summaryLoading ? '...' : `₹${totalExpense.toFixed(0)}`}
-          tone="negative"
-          subtitle="Current month"
-        />
-        <StatCard
-          label="Net savings"
-          value={summaryLoading ? '...' : `₹${netSavings.toFixed(0)}`}
+          label="Money Left"
+          value={summaryLoading ? '...' : `₹${netSavings.toLocaleString('en-IN')}`}
           tone={netSavings >= 0 ? 'positive' : 'negative'}
-          subtitle={netSavings >= 0 ? 'You are in the green' : 'Spending exceeds income'}
+          subtitle="Net savings this month"
         />
-        <GlassCard
-          style={{
-            padding: '1rem 1.1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '0.75rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: 'var(--text-muted)',
-            }}
-          >
-            Activity
-          </span>
-          <span style={{ fontSize: '1.1rem', fontWeight: 500 }}>
-            {loadingTx ? 'Loading...' : `${recentTransactions.length} recent transactions`}
-          </span>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
-            Last 5 items this month
-          </span>
-        </GlassCard>
       </div>
 
       {/* Middle Grid Section */}
       <div style={{ display: 'grid', gridTemplateColumns: '4fr 6fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
         {/* Left Column (40% width) - Upcoming Payments Widget */}
-        <GlassCard style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <GlassCard style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifycontent: 'space-between' }}>
           <div>
             <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
               Upcoming Payments
@@ -262,93 +200,29 @@ const DashboardPage = () => {
           </div>
         </GlassCard>
 
-        {/* Right Column (60% width) - Spending by Category, Health, Budget */}
+        {/* Right Column (60% width) - Budget Only */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <DonutChartWrapper
-              title="Spending by category"
-              data={catData}
-              dataKeyName="category"
-              dataKeyValue="total"
-            />
-            
-            {/* Financial Health Score Card */}
-            <GlassCard style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: '0.2rem' }}>
-                  Financial Health
-                </div>
-                <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '1rem' }}>
-                  Based on savings, budgets, and consistency.
-                </div>
-              </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div
-                  style={{
-                    width: 84,
-                    height: 84,
-                    borderRadius: '50%',
-                    background: `conic-gradient(var(--accent-primary) ${healthScore * 3.6}deg, rgba(156, 145, 159, 0.15) 0deg)`,
-                    display: 'grid',
-                    placeItems: 'center',
-                    flexShrink: 0
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 68,
-                      height: 68,
-                      borderRadius: '50%',
-                      background: 'var(--bg-secondary)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {loadingHealth ? '-' : healthScore}
-                    </div>
-                    <div className="text-muted" style={{ fontSize: '0.6rem' }}>
-                      Score
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-primary-light)' }}>
-                    Grade {grade}
-                  </div>
-                  <div className="text-muted" style={{ fontSize: '0.74rem', marginTop: '0.25rem', lineHeight: 1.3 }}>
-                    {healthScore >= 80 ? 'Excellent financial management. Keep it up!' : 'Stable progress, but watch your category budgets.'}
-                  </div>
-                </div>
-              </div>
-            </GlassCard>
-          </div>
-          
           {/* Budget Progress Card */}
-          <GlassCard style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <GlassCard style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
                   Budget Adherence
                 </div>
-                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                  Limits and spending across top categories
+                <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                  Limits and spending status across your top categories
                 </div>
               </div>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {displayBudgets.map((b) => {
                 const percent = b.limit > 0 ? (b.spent / b.limit) * 100 : 0;
                 return (
                   <div key={b.category}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                      <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{b.category}</span>
-                      <span className="text-muted">₹{b.spent.toFixed(0)} / ₹{b.limit.toFixed(0)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{b.category}</span>
+                      <span className="text-muted" style={{ fontWeight: 500 }}>₹{b.spent.toFixed(0)} / ₹{b.limit.toFixed(0)}</span>
                     </div>
                     <ProgressBar value={percent} />
                   </div>
@@ -455,23 +329,29 @@ const DashboardPage = () => {
             </div>
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {displayGoals.map((g) => {
-              const percent = g.targetAmount > 0 ? (g.savedAmount / g.targetAmount) * 100 : 0;
-              return (
-                <div key={g.title || g._id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                    <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{g.title}</span>
-                    <span className="text-muted">₹{g.savedAmount.toLocaleString('en-IN')} / ₹{g.targetAmount.toLocaleString('en-IN')}</span>
+          {displayGoals.length === 0 ? (
+            <div className="text-muted" style={{ fontSize: '0.85rem', padding: '2rem 0', textAlign: 'center' }}>
+              No active goals created yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {displayGoals.slice(0, 2).map((g) => {
+                const percent = g.targetAmount > 0 ? (g.savedAmount / g.targetAmount) * 100 : 0;
+                return (
+                  <div key={g.title || g._id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                      <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{g.title}</span>
+                      <span className="text-muted">₹{g.savedAmount.toLocaleString('en-IN')} / ₹{g.targetAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                    <ProgressBar value={percent} />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.15rem', textAlign: 'right' }}>
+                      {percent.toFixed(0)}% reached
+                    </div>
                   </div>
-                  <ProgressBar value={percent} />
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.15rem', textAlign: 'right' }}>
-                    {percent.toFixed(0)}% reached
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </GlassCard>
       </div>
 
