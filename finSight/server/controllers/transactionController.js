@@ -2,6 +2,7 @@ const Transaction = require('../models/Transaction');
 const SplitGroup = require('../models/SplitGroup');
 const { parseNaturalLanguageInput } = require('../services/quickAddParser');
 const { parseBankAlert } = require('../services/bankAlertParser');
+const { analyzeReceiptExpense } = require('../services/textractService');
 
 exports.getTransactions = async (req, res) => {
   try {
@@ -210,6 +211,23 @@ exports.parseBankAlertEndpoint = async (req, res) => {
   } catch (err) {
     console.error('Bank alert parsing error:', err);
     return res.status(500).json({ success: false, message: 'Failed to parse bank alert' });
+  }
+};
+
+exports.scanReceiptEndpoint = async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload a receipt image (JPEG, PNG, or WebP up to 5MB)',
+      });
+    }
+
+    const result = await analyzeReceiptExpense(req.file.buffer, req.file.mimetype);
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('Receipt scan error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to process receipt' });
   }
 };
 

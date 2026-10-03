@@ -7,6 +7,7 @@ import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
 import TripModeWidget from '../components/TripModeWidget.jsx';
 import RecurringTemplatesWidget from '../components/RecurringTemplatesWidget.jsx';
 import BankAlertBox from '../components/BankAlertBox.jsx';
+import ReceiptScannerBox from '../components/ReceiptScannerBox.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import api from '../api/axios.js';
 import { useState } from 'react';
@@ -287,6 +288,14 @@ const DashboardPage = () => {
           </button>
           <button
             type="button"
+            className={modalTab === 'receipt' ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+            onClick={() => setModalTab('receipt')}
+          >
+            🧾 Scan Receipt
+          </button>
+          <button
+            type="button"
             className={modalTab === 'manual' ? 'btn-primary' : 'btn-secondary'}
             style={{ fontSize: '0.8rem', padding: '6px 14px' }}
             onClick={() => setModalTab('manual')}
@@ -307,6 +316,16 @@ const DashboardPage = () => {
 
         {modalTab === 'sms' && (
           <BankAlertBox
+            compact
+            onTransactionCreated={(newTx) => {
+              handleTransactionCreated(newTx);
+              setModalOpen(false);
+            }}
+          />
+        )}
+
+        {modalTab === 'receipt' && (
+          <ReceiptScannerBox
             compact
             onTransactionCreated={(newTx) => {
               handleTransactionCreated(newTx);

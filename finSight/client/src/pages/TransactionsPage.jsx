@@ -4,6 +4,7 @@ import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
 import BankAlertImportModal from '../components/BankAlertImportModal.jsx';
+import ReceiptScannerModal from '../components/ReceiptScannerModal.jsx';
 import api from '../api/axios.js';
 
 const TransactionsPage = () => {
@@ -20,6 +21,7 @@ const TransactionsPage = () => {
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [smsModalOpen, setSmsModalOpen] = useState(false);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -133,7 +135,15 @@ const TransactionsPage = () => {
             Search, filter, and manage every income and expense line.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setReceiptModalOpen(true)}
+            style={{ fontSize: '0.85rem' }}
+          >
+            🧾 Scan Receipt
+          </button>
           <button
             type="button"
             className="btn-secondary"
@@ -358,6 +368,12 @@ const TransactionsPage = () => {
       <BankAlertImportModal
         isOpen={smsModalOpen}
         onClose={() => setSmsModalOpen(false)}
+        onTransactionCreated={() => fetchTransactions()}
+      />
+
+      <ReceiptScannerModal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
         onTransactionCreated={() => fetchTransactions()}
       />
     </>
