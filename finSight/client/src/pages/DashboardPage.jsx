@@ -5,6 +5,7 @@ import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
 import TripModeWidget from '../components/TripModeWidget.jsx';
+import RecurringTemplatesWidget from '../components/RecurringTemplatesWidget.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import api from '../api/axios.js';
 import { useState } from 'react';
@@ -64,20 +65,6 @@ const DashboardPage = () => {
 
   const displayGoals = goals && goals.length > 0 ? goals : [];
 
-  const getDynamicDate = (daysFromNow) => {
-    const date = new Date();
-    date.setDate(date.getDate() + daysFromNow);
-    return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
-  };
-
-  const staticPayments = [
-    { name: 'Netflix', amount: 649, days: 3, logo: '🍿' },
-    { name: 'Spotify', amount: 119, days: 7, logo: '🎵' },
-    { name: 'Internet', amount: 899, days: 12, logo: '🌐' },
-    { name: 'Electricity', amount: 1200, days: 15, logo: '⚡' },
-    { name: 'ChatGPT Plus', amount: 1999, days: 20, logo: '🤖' }
-  ];
-
   return (
     <>
       <div
@@ -117,108 +104,8 @@ const DashboardPage = () => {
 
       {/* Middle Grid Section */}
       <div style={{ display: 'grid', gridTemplateColumns: '4fr 6fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-        {/* Left Column (40% width) - Upcoming Payments Widget */}
-        <GlassCard style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifycontent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-              Upcoming Payments
-            </div>
-            <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '1rem' }}>
-              Auto-payments and recurring subscriptions due soon
-            </div>
-            
-            <div style={{ maxHeight: '210px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-              {staticPayments.map((pay) => (
-                <div key={pay.name} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0.55rem 0.65rem',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-color)',
-                  marginBottom: '0.45rem',
-                  transition: 'transform 0.15s ease',
-                  cursor: 'pointer'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '1.1rem' }}>{pay.logo}</span>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--accent-primary)', fontSize: '0.8rem' }}>{pay.name}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Due {getDynamicDate(pay.days)}</div>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--accent-primary-light)', fontSize: '0.8rem' }}>₹{pay.amount}</div>
-                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', marginTop: '0.1rem' }}>
-                      <span style={{
-                        fontSize: '0.6rem',
-                        padding: '1px 5px',
-                        background: 'var(--bg-light)',
-                        color: 'var(--accent-primary)',
-                        borderRadius: '999px',
-                        fontWeight: 600
-                      }}>AutoPay</span>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{pay.days}d</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-              <a href="/analytics" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent-primary-light)' }}>
-                View All →
-              </a>
-            </div>
-            
-            {/* Smart Summary Section */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.5rem',
-              marginTop: '0.75rem',
-              borderTop: '1px solid var(--divider-color)',
-              paddingTop: '0.75rem'
-            }}>
-              <div style={{
-                background: 'var(--bg-secondary)',
-                padding: '0.5rem 0.65rem',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-color)',
-              }}>
-                <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Monthly Recurring</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>₹4,866</div>
-              </div>
-              <div style={{
-                background: 'var(--bg-secondary)',
-                padding: '0.5rem 0.65rem',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-color)',
-              }}>
-                <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Potential Annual</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>₹58,392</div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Subscription Alert */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            background: 'var(--bg-light)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)',
-            padding: '0.5rem 0.65rem',
-            marginTop: '0.75rem'
-          }}>
-            <span style={{ fontSize: '0.9rem' }}>⚠️</span>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>
-              <strong>Subscription Review:</strong> You haven't used Spotify recently. Savings: <strong style={{ color: 'var(--color-expense)' }}>₹119/month</strong>
-            </div>
-          </div>
-        </GlassCard>
+        {/* Left Column (40% width) - Live Recurring Templates & Payments Widget */}
+        <RecurringTemplatesWidget onTransactionLogged={handleTransactionCreated} />
 
         {/* Right Column (60% width) - Budget Only */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
