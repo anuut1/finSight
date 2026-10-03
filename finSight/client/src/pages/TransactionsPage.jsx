@@ -5,6 +5,7 @@ import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
 import BankAlertImportModal from '../components/BankAlertImportModal.jsx';
 import ReceiptScannerModal from '../components/ReceiptScannerModal.jsx';
+import UnconfirmedDraftsDrawer from '../components/UnconfirmedDraftsDrawer.jsx';
 import api from '../api/axios.js';
 
 const TransactionsPage = () => {
@@ -157,6 +158,8 @@ const TransactionsPage = () => {
           </button>
         </div>
       </div>
+
+      <UnconfirmedDraftsDrawer onDraftsUpdated={fetchTransactions} />
 
       <NaturalLanguageQuickAdd onTransactionCreated={() => fetchTransactions()} />
 

@@ -1,13 +1,25 @@
 const Transaction = require('../models/Transaction');
 const SplitGroup = require('../models/SplitGroup');
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 const { parseNaturalLanguageInput } = require('../services/quickAddParser');
 const { parseBankAlert } = require('../services/bankAlertParser');
 const { analyzeReceiptExpense } = require('../services/textractService');
+const {
+  sendEodReminderForUser,
+  sweepAllUsersForEodReminders,
+} = require('../services/eodReminderService');
 
 exports.getTransactions = async (req, res) => {
   try {
-    const { type, category, startDate, endDate, page = 1, limit = 10 } = req.query;
+    const { type, category, startDate, endDate, status, page = 1, limit = 10 } = req.query;
     const query = { userId: req.user.id };
+
+    if (status === 'draft') {
+      query.status = 'draft';
+    } else if (status !== 'all') {
+      query.status = { $ne: 'draft' };
+    }
 
     if (type) query.type = type;
     if (category) query.category = category;
@@ -54,12 +66,16 @@ exports.createTransaction = async (req, res) => {
       mood = 'neutral',
       autoTagTrip = true,
       splitGroupId,
+      status = 'confirmed',
+      isDraft = false,
+      metadata = {},
     } = req.body;
 
     if (!type || !category || !amount || !date) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
+    const finalStatus = isDraft || status === 'draft' ? 'draft' : 'confirmed';
     let finalTags = Array.isArray(tags) ? [...tags] : [];
     let finalSplitGroupId = splitGroupId;
     let source = 'manual';
@@ -94,10 +110,12 @@ exports.createTransaction = async (req, res) => {
       source,
       currency,
       splitGroupId: finalSplitGroupId,
+      status: finalStatus,
+      metadata,
     });
 
     // If an active trip exists and this is an expense, automatically sync as a trip expense split among preset members
-    if (activeTrip && type === 'expense' && activeTrip.members?.length) {
+    if (finalStatus === 'confirmed' && activeTrip && type === 'expense' && activeTrip.members?.length) {
       try {
         const memberIds = activeTrip.members.map((m) => m._id);
         const ownerId = activeTrip.ownerMemberId || memberIds[0];
@@ -230,4 +248,170 @@ exports.scanReceiptEndpoint = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to process receipt' });
   }
 };
+
+exports.getDrafts = async (req, res) => {
+  try {
+    const drafts = await Transaction.find({
+      userId: req.user.id,
+      status: 'draft',
+    }).sort({ date: -1 });
+
+    const totalAmount = drafts.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+    return res.json({
+      success: true,
+      data: drafts,
+      count: drafts.length,
+      totalAmount,
+    });
+  } catch (err) {
+    console.error('Error fetching drafts:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch unconfirmed drafts' });
+  }
+};
+
+exports.approveDraft = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = { status: 'confirmed' };
+    if (req.body.category) updates.category = req.body.category;
+    if (req.body.amount !== undefined) updates.amount = Number(req.body.amount);
+    if (req.body.description !== undefined) updates.description = req.body.description;
+    if (req.body.date) updates.date = req.body.date;
+
+    const transaction = await Transaction.findOneAndUpdate(
+      { _id: id, userId: req.user.id, status: 'draft' },
+      updates,
+      { new: true }
+    );
+
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: 'Draft not found or already confirmed' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Draft approved successfully',
+      data: transaction,
+    });
+  } catch (err) {
+    console.error('Error approving draft:', err);
+    return res.status(500).json({ success: false, message: 'Failed to approve draft' });
+  }
+};
+
+exports.approveAllDrafts = async (req, res) => {
+  try {
+    const result = await Transaction.updateMany(
+      { userId: req.user.id, status: 'draft' },
+      { status: 'confirmed' }
+    );
+
+    return res.json({
+      success: true,
+      message: `Successfully approved ${result.modifiedCount} draft(s)`,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (err) {
+    console.error('Error approving all drafts:', err);
+    return res.status(500).json({ success: false, message: 'Failed to approve drafts' });
+  }
+};
+
+exports.rejectDraft = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Transaction.findOneAndDelete({
+      _id: id,
+      userId: req.user.id,
+      status: 'draft',
+    });
+
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Draft not found' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Draft dismissed successfully',
+      data: deleted,
+    });
+  } catch (err) {
+    console.error('Error dismissing draft:', err);
+    return res.status(500).json({ success: false, message: 'Failed to dismiss draft' });
+  }
+};
+
+exports.magicApproveDrafts = async (req, res) => {
+  try {
+    const { token } = req.query;
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+
+    if (!token) {
+      return res.status(400).send('<h1>Invalid or missing approval token</h1>');
+    }
+
+    const secret = process.env.JWT_SECRET || 'finsight_jwt_secret_dev';
+    let decoded;
+    try {
+      decoded = jwt.verify(token, secret);
+    } catch {
+      return res.status(401).send(`
+        <!DOCTYPE html>
+        <html>
+          <body style="background:#0B1020; color:#F8FAFC; font-family: system-ui, sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;">
+            <div style="background:#0F172A; padding:36px; border-radius:16px; border:1px solid #1E293B; text-align:center; max-width:440px;">
+              <h2 style="color:#F43F5E; margin-top:0;">Link Expired or Invalid</h2>
+              <p style="color:#94A3B8; font-size:15px; line-height:1.6;">This one-tap approval link has expired or has already been used. Please visit FinSight to review your pending drafts.</p>
+              <a href="${clientUrl}/dashboard" style="display:inline-block; margin-top:16px; padding:12px 24px; background:#6366F1; color:#fff; text-decoration:none; border-radius:8px; font-weight:600;">Open Dashboard</a>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    const { userId, draftIds } = decoded;
+    const filter = {
+      userId,
+      status: 'draft',
+    };
+    if (Array.isArray(draftIds) && draftIds.length) {
+      filter._id = { $in: draftIds };
+    }
+
+    const result = await Transaction.updateMany(filter, { status: 'confirmed' });
+
+    // Redirect to web app with confirmation query params
+    return res.redirect(`${clientUrl}/dashboard?drafts_approved=true&count=${result.modifiedCount}`);
+  } catch (err) {
+    console.error('Magic approve error:', err);
+    return res.status(500).send('Server error during approval');
+  }
+};
+
+exports.triggerEodReminder = async (req, res) => {
+  try {
+    // If triggered by a logged-in user in the UI, process and return digest for that user
+    if (req.user && req.user.id) {
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      const result = await sendEodReminderForUser(user);
+      return res.json({ success: true, data: result });
+    }
+
+    // Otherwise, triggered by EventBridge / Lambda with secret
+    if (req.isCronTrigger) {
+      const results = await sweepAllUsersForEodReminders();
+      return res.json({ success: true, data: results });
+    }
+
+    return res.status(401).json({ success: false, message: 'Unauthorized trigger' });
+  } catch (err) {
+    console.error('EOD reminder trigger error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to process EOD reminder' });
+  }
+};
+
 

@@ -8,6 +8,7 @@ import TripModeWidget from '../components/TripModeWidget.jsx';
 import RecurringTemplatesWidget from '../components/RecurringTemplatesWidget.jsx';
 import BankAlertBox from '../components/BankAlertBox.jsx';
 import ReceiptScannerBox from '../components/ReceiptScannerBox.jsx';
+import UnconfirmedDraftsDrawer from '../components/UnconfirmedDraftsDrawer.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import api from '../api/axios.js';
 import { useState } from 'react';
@@ -87,6 +88,9 @@ const DashboardPage = () => {
           + Quick add transaction
         </button>
       </div>
+
+      {/* Unconfirmed Drafts EOD Banner & Drawer */}
+      <UnconfirmedDraftsDrawer onDraftsUpdated={() => setRefreshCount((c) => c + 1)} />
 
       {/* Trip Mode Banner & Controls */}
       <TripModeWidget onTripChanged={() => setRefreshCount((c) => c + 1)} />

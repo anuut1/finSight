@@ -14,6 +14,8 @@ const transactionSchema = new mongoose.Schema(
     splitGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'SplitGroup' },
     splitExpenseId: { type: mongoose.Schema.Types.ObjectId },
     currency: { type: String, default: 'INR' },
+    status: { type: String, enum: ['confirmed', 'draft'], default: 'confirmed' },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

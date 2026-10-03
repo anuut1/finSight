@@ -205,7 +205,7 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
   };
 
   // Strictly save ONLY upon explicit confirmation click
-  const handleConfirmAndSave = async () => {
+  const handleConfirmAndSave = async (asDraft = false) => {
     if (!draft) return;
     if (!draft.amount || Number(draft.amount) <= 0) {
       setParseError('Please enter a valid amount greater than 0.');
@@ -225,6 +225,8 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
         date: draft.date,
         mood: draft.mood,
         tags: ['quick-add'],
+        isDraft: asDraft,
+        status: asDraft ? 'draft' : 'confirmed',
       };
 
       if (draft.isSplit && draft.splitMembers) {
@@ -768,23 +770,37 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
               className="btn-secondary"
               onClick={handleDiscard}
               disabled={saving}
-              style={{ padding: '8px 18px', fontSize: '0.82rem' }}
+              style={{ padding: '8px 14px', fontSize: '0.82rem' }}
             >
               Discard
             </button>
             <button
               type="button"
-              className="btn-primary"
-              onClick={handleConfirmAndSave}
+              className="btn-secondary"
+              onClick={() => handleConfirmAndSave(true)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
               style={{
-                padding: '9px 24px',
+                padding: '8px 14px',
+                fontSize: '0.82rem',
+                borderColor: '#6366F1',
+                color: '#A5B4FC',
+              }}
+            >
+              💾 Save as Draft
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => handleConfirmAndSave(false)}
+              disabled={saving || !draft.amount || Number(draft.amount) <= 0}
+              style={{
+                padding: '9px 20px',
                 fontSize: '0.85rem',
                 fontWeight: 700,
                 boxShadow: 'var(--shadow-md)',
               }}
             >
-              {saving ? 'Saving...' : '✓ Confirm & Save Transaction'}
+              {saving ? 'Saving...' : '✓ Confirm & Save'}
             </button>
           </div>
         </div>

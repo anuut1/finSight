@@ -1,6 +1,27 @@
 const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
+  // Allow public magic email approval links (token is verified in the controller)
+  if (
+    req.path.startsWith('/drafts/magic-approve') ||
+    req.originalUrl?.includes('/api/transactions/drafts/magic-approve')
+  ) {
+    return next();
+  }
+
+  // Allow AWS EventBridge / Lambda trigger with shared secret key
+  const reminderSecret = req.headers['x-reminder-secret'];
+  if (
+    (req.path.startsWith('/drafts/eod-trigger') ||
+      req.originalUrl?.includes('/api/transactions/drafts/eod-trigger')) &&
+    reminderSecret &&
+    process.env.REMINDER_SECRET_KEY &&
+    reminderSecret === process.env.REMINDER_SECRET_KEY
+  ) {
+    req.isCronTrigger = true;
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

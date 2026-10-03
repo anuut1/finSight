@@ -85,7 +85,7 @@ const BankAlertBox = ({ onTransactionCreated, compact = false }) => {
     setSuccess(false);
   };
 
-  const handleConfirmAndSave = async () => {
+  const handleConfirmAndSave = async (asDraft = false) => {
     if (!draft) return;
     if (!draft.amount || Number(draft.amount) <= 0) {
       setParseError('Please enter a valid amount greater than 0.');
@@ -104,6 +104,8 @@ const BankAlertBox = ({ onTransactionCreated, compact = false }) => {
         date: draft.date,
         tags: draft.tags || ['bank-alert'],
         mood: draft.mood || 'neutral',
+        isDraft: asDraft,
+        status: asDraft ? 'draft' : 'confirmed',
       };
 
       const res = await api.post('/transactions', payload);
@@ -401,18 +403,32 @@ const BankAlertBox = ({ onTransactionCreated, compact = false }) => {
               className="btn-secondary"
               onClick={handleDiscard}
               disabled={saving}
-              style={{ fontSize: '0.8rem', padding: '6px 16px' }}
+              style={{ fontSize: '0.8rem', padding: '6px 14px' }}
             >
               Discard
             </button>
             <button
               type="button"
+              className="btn-secondary"
+              onClick={() => handleConfirmAndSave(true)}
+              disabled={saving || !draft.amount || Number(draft.amount) <= 0}
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 14px',
+                borderColor: '#6366F1',
+                color: '#A5B4FC',
+              }}
+            >
+              💾 Save as Draft
+            </button>
+            <button
+              type="button"
               className="btn-primary"
-              onClick={handleConfirmAndSave}
+              onClick={() => handleConfirmAndSave(false)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
               style={{ fontSize: '0.82rem', padding: '7px 20px', fontWeight: 700 }}
             >
-              {saving ? 'Saving...' : '✓ Confirm & Save Transaction'}
+              {saving ? 'Saving...' : '✓ Confirm & Save'}
             </button>
           </div>
         </div>
