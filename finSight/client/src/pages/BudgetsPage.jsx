@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import GlassCard from '../components/GlassCard.jsx';
+import Card from '../components/Card.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import Modal from '../components/Modal.jsx';
 import api from '../api/axios.js';
@@ -77,12 +77,14 @@ const BudgetsPage = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: '1.25rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.6rem' }}>Budgets</h1>
+          <h1 style={{ margin: 0, fontSize: '1.65rem', fontWeight: 700 }}>Budgets</h1>
           <p className="text-muted" style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
-            Allocate spending limits per category and watch your progress.
+            Allocate monthly spending caps per category and track limits in real time.
           </p>
         </div>
         <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
@@ -94,11 +96,12 @@ const BudgetsPage = () => {
         <div
           style={{
             marginBottom: '0.75rem',
-            padding: '0.6rem 0.9rem',
-            borderRadius: 999,
-            background: 'rgba(255, 107, 107, 0.1)',
-            color: 'var(--accent-red)',
-            fontSize: '0.8rem',
+            padding: '0.65rem 0.95rem',
+            borderRadius: 'var(--radius-md, 12px)',
+            background: 'var(--color-negative-bg)',
+            color: 'var(--color-negative)',
+            border: '1px solid var(--color-negative-border)',
+            fontSize: '0.82rem',
           }}
         >
           {error}
@@ -106,82 +109,116 @@ const BudgetsPage = () => {
       )}
 
       {loading ? (
-        <GlassCard style={{ padding: '1rem 1.2rem' }}>
+        <Card style={{ padding: '1.25rem 1.4rem' }}>
           <p className="text-muted" style={{ margin: 0 }}>
             Loading budgets...
           </p>
-        </GlassCard>
+        </Card>
       ) : (
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '1rem',
           }}
         >
           {budgets.length === 0 && (
-            <GlassCard style={{ padding: '1rem 1.2rem' }}>
-              <p className="text-muted" style={{ margin: 0 }}>
-                No budgets yet. Create one to start tracking.
+            <Card style={{ padding: '1.5rem', gridColumn: '1 / -1', textAlign: 'center' }}>
+              <p className="text-muted" style={{ margin: 0, fontSize: '0.9rem' }}>
+                No budgets configured yet. Create a category budget to keep spending in check.
               </p>
-            </GlassCard>
+            </Card>
           )}
           {budgets.map((b) => {
             const spent = b.spent || 0;
-            const percent = b.limit > 0 ? (spent / b.limit) * 100 : 0;
+            const limit = b.limit || 1;
+            const percent = limit > 0 ? (spent / limit) * 100 : 0;
             const over = percent > 100;
-            const nearLimit = percent > 80;
+            const nearLimit = percent >= 80 && !over;
+            const remaining = Math.max(0, limit - spent);
 
             return (
-              <GlassCard key={b._id} style={{ padding: '0.9rem 1.1rem' }}>
+              <Card key={b._id} style={{ padding: '1.2rem 1.3rem' }}>
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '0.3rem',
+                    alignItems: 'flex-start',
+                    marginBottom: '0.6rem',
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 500 }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 650, color: 'var(--text-primary)' }}>
                       {b.category}
                     </div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                      Limit ₹{b.limit.toFixed(0)}
+                    <div className="text-muted num-tabular" style={{ fontSize: '0.78rem', marginTop: '2px' }}>
+                      Cap: ₹{Number(b.limit).toLocaleString('en-IN')}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleDelete(b._id)}
                     style={{
-                      border: 'none',
+                      border: '1px solid rgba(244, 63, 94, 0.25)',
                       background: 'transparent',
-                      color: 'var(--accent-red)',
+                      color: 'var(--color-negative)',
                       cursor: 'pointer',
-                      fontSize: '0.8rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-sm, 8px)',
                     }}
                   >
                     Remove
                   </button>
                 </div>
-                <div style={{ marginBottom: '0.3rem', fontSize: '0.8rem' }}>
-                  Spent ₹{spent.toFixed(0)} ({percent.toFixed(0)}%)
-                </div>
-                <ProgressBar value={percent} />
+
                 <div
                   style={{
-                    marginTop: '0.3rem',
-                    fontSize: '0.75rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                    marginBottom: '0.45rem',
+                    fontSize: '0.84rem',
                   }}
-                  className="text-muted"
                 >
-                  {over
-                    ? 'Over budget — consider trimming this category.'
-                    : nearLimit
-                    ? 'Close to the limit — monitor upcoming expenses.'
-                    : 'Comfortably within your limit.'}
+                  <span className="num-tabular" style={{ fontWeight: 600, color: over ? 'var(--color-negative)' : 'var(--text-primary)' }}>
+                    ₹{Number(spent).toLocaleString('en-IN')} <span className="text-muted" style={{ fontWeight: 400 }}>spent</span>
+                  </span>
+                  <span
+                    className="num-tabular"
+                    style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      color: over ? 'var(--color-negative)' : nearLimit ? 'var(--color-warning)' : 'var(--color-positive)',
+                    }}
+                  >
+                    {percent.toFixed(0)}%
+                  </span>
                 </div>
-              </GlassCard>
+
+                <ProgressBar value={percent} />
+
+                <div
+                  style={{
+                    marginTop: '0.65rem',
+                    fontSize: '0.76rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: over ? 'var(--color-negative)' : nearLimit ? 'var(--color-warning)' : 'var(--color-positive)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {over ? (
+                    <>⚠️ Over budget by ₹{(spent - limit).toLocaleString('en-IN')}</>
+                  ) : nearLimit ? (
+                    <>⚡ Close to limit — ₹{remaining.toLocaleString('en-IN')} left</>
+                  ) : (
+                    <>✓ ₹{remaining.toLocaleString('en-IN')} remaining this month</>
+                  )}
+                </div>
+              </Card>
             );
           })}
         </div>

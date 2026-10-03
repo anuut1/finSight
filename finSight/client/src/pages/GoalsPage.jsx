@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import GlassCard from '../components/GlassCard.jsx';
+import Card from '../components/Card.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import Modal from '../components/Modal.jsx';
 import api from '../api/axios.js';
+import { triggerConfetti } from '../utils/confetti.js';
 
 const GoalsPage = () => {
   const [goals, setGoals] = useState([]);
@@ -57,6 +58,9 @@ const GoalsPage = () => {
       const res = await api.post('/goals', payload);
       if (res.data?.success) {
         setGoals((prev) => [...prev, res.data.data]);
+        if (payload.savedAmount >= payload.targetAmount) {
+          triggerConfetti();
+        }
         setForm({ title: '', targetAmount: '', savedAmount: '', deadline: '' });
         setModalOpen(false);
       }
@@ -85,6 +89,7 @@ const GoalsPage = () => {
     if (!amount) return;
     try {
       const newSaved = (activeGoal.savedAmount || 0) + amount;
+      const willComplete = newSaved >= activeGoal.targetAmount && (activeGoal.savedAmount || 0) < activeGoal.targetAmount;
       const status = newSaved >= activeGoal.targetAmount ? 'completed' : activeGoal.status;
       const res = await api.put(`/goals/${activeGoal._id}`, {
         savedAmount: newSaved,
@@ -94,6 +99,9 @@ const GoalsPage = () => {
         setGoals((prev) =>
           prev.map((g) => (g._id === activeGoal._id ? res.data.data : g))
         );
+        if (willComplete) {
+          triggerConfetti();
+        }
         setActiveGoal(null);
         setFundAmount('');
       }
@@ -115,12 +123,14 @@ const GoalsPage = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: '1.25rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.6rem' }}>Goals</h1>
+          <h1 style={{ margin: 0, fontSize: '1.65rem', fontWeight: 700 }}>Goals</h1>
           <p className="text-muted" style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
-            Track long‑term savings targets and celebrate progress.
+            Track long-term savings targets and celebrate milestone progress.
           </p>
         </div>
         <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
@@ -132,11 +142,12 @@ const GoalsPage = () => {
         <div
           style={{
             marginBottom: '0.75rem',
-            padding: '0.6rem 0.9rem',
-            borderRadius: 999,
-            background: 'rgba(255, 107, 107, 0.1)',
-            color: 'var(--accent-red)',
-            fontSize: '0.8rem',
+            padding: '0.65rem 0.95rem',
+            borderRadius: 'var(--radius-md, 12px)',
+            background: 'var(--color-negative-bg)',
+            color: 'var(--color-negative)',
+            border: '1px solid var(--color-negative-border)',
+            fontSize: '0.82rem',
           }}
         >
           {error}
@@ -144,25 +155,25 @@ const GoalsPage = () => {
       )}
 
       {loading ? (
-        <GlassCard style={{ padding: '1rem 1.2rem' }}>
+        <Card style={{ padding: '1.25rem 1.4rem' }}>
           <p className="text-muted" style={{ margin: 0 }}>
             Loading goals...
           </p>
-        </GlassCard>
+        </Card>
       ) : (
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '1rem',
           }}
         >
           {goals.length === 0 && (
-            <GlassCard style={{ padding: '1rem 1.2rem' }}>
-              <p className="text-muted" style={{ margin: 0 }}>
-                No goals yet. Add one to start tracking a target.
+            <Card style={{ padding: '1.5rem', gridColumn: '1 / -1', textAlign: 'center' }}>
+              <p className="text-muted" style={{ margin: 0, fontSize: '0.9rem' }}>
+                No goals yet. Create a savings target to begin tracking milestones.
               </p>
-            </GlassCard>
+            </Card>
           )}
           {goals.map((g) => {
             const progress =
@@ -172,77 +183,105 @@ const GoalsPage = () => {
             const isCompleted = g.status === 'completed' || progress >= 100;
 
             return (
-              <GlassCard key={g._id} style={{ padding: '0.9rem 1.1rem' }}>
+              <Card key={g._id} style={{ padding: '1.25rem 1.35rem' }}>
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
-                    marginBottom: '0.3rem',
+                    marginBottom: '0.6rem',
+                    gap: '0.5rem',
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 500 }}>{g.title}</div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                      Target ₹{g.targetAmount.toFixed(0)}
+                    <div style={{ fontSize: '1.05rem', fontWeight: 650, color: 'var(--text-primary)' }}>
+                      {g.title}
+                    </div>
+                    <div className="text-muted num-tabular" style={{ fontSize: '0.78rem', marginTop: '2px' }}>
+                      Target: ₹{Number(g.targetAmount).toLocaleString('en-IN')}
                     </div>
                   </div>
                   <span
-                    className="badge"
                     style={{
-                      background: isCompleted
-                        ? 'rgba(0,212,170,0.1)'
-                        : 'rgba(79,142,247,0.15)',
-                      color: isCompleted ? 'var(--accent-teal)' : 'var(--accent-blue)',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-full)',
+                      background: isCompleted ? 'var(--color-positive-bg)' : 'var(--color-accent-subtle)',
+                      color: isCompleted ? 'var(--color-positive)' : 'var(--color-accent)',
+                      border: `1px solid ${isCompleted ? 'var(--color-positive-border)' : 'var(--border-strong)'}`,
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {isCompleted ? 'Completed' : 'Active'}
+                    {isCompleted ? '✓ Reached' : `${progress.toFixed(0)}% saved`}
                   </span>
                 </div>
-                <div style={{ fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-                  Saved ₹{g.savedAmount.toFixed(0)} ({progress.toFixed(0)}%)
-                </div>
-                <ProgressBar value={progress} />
+
                 <div
                   style={{
-                    marginTop: '0.3rem',
-                    fontSize: '0.75rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                    marginBottom: '0.45rem',
+                    fontSize: '0.84rem',
                   }}
-                  className="text-muted"
                 >
-                  Deadline {new Date(g.deadline).toLocaleDateString()}
+                  <span className="num-tabular" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                    ₹{Number(g.savedAmount).toLocaleString('en-IN')}{' '}
+                    <span className="text-muted" style={{ fontWeight: 400 }}>
+                      of ₹{Number(g.targetAmount).toLocaleString('en-IN')}
+                    </span>
+                  </span>
                 </div>
+
+                <ProgressBar value={progress} />
+
+                <div
+                  style={{
+                    marginTop: '0.55rem',
+                    fontSize: '0.76rem',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  Deadline: {new Date(g.deadline).toLocaleDateString()}
+                </div>
+
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginTop: '0.5rem',
+                    marginTop: '0.85rem',
+                    paddingTop: '0.65rem',
+                    borderTop: '1px solid var(--border-color)',
                   }}
                 >
                   <button
                     type="button"
                     className="btn-primary"
-                    style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem' }}
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
                     onClick={() => openFundModal(g)}
                   >
-                    Add funds
+                    + Add funds
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(g._id)}
                     style={{
-                      border: 'none',
+                      border: '1px solid rgba(244, 63, 94, 0.25)',
                       background: 'transparent',
-                      color: 'var(--accent-red)',
+                      color: 'var(--color-negative)',
                       cursor: 'pointer',
-                      fontSize: '0.8rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-sm, 8px)',
                     }}
                   >
                     Remove
                   </button>
                 </div>
-              </GlassCard>
+              </Card>
             );
           })}
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import GlassCard from '../components/GlassCard.jsx';
+import Card from '../components/Card.jsx';
+import BalanceChip from '../components/BalanceChip.jsx';
 import Modal from '../components/Modal.jsx';
 import TripModeWidget from '../components/TripModeWidget.jsx';
 import api from '../api/axios.js';
@@ -251,13 +252,13 @@ const SplitsPage = () => {
       )}
 
       {loading ? (
-        <GlassCard style={{ padding: '1rem 1.2rem' }}>
+        <Card style={{ padding: '1rem 1.2rem' }}>
           <p className="text-muted" style={{ margin: 0 }}>
             Loading split groups...
           </p>
-        </GlassCard>
+        </Card>
       ) : groups.length === 0 ? (
-        <GlassCard style={{ padding: '1.2rem 1.4rem' }}>
+        <Card style={{ padding: '1.2rem 1.4rem' }}>
           <h2 style={{ margin: 0, fontSize: '1rem' }}>No groups yet</h2>
           <p className="text-muted" style={{ fontSize: '0.85rem' }}>
             Create a group for a trip, room, dinner, or project to start splitting costs.
@@ -265,10 +266,10 @@ const SplitsPage = () => {
           <button type="button" className="btn-primary" onClick={() => setGroupModalOpen(true)}>
             Create your first group
           </button>
-        </GlassCard>
+        </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '1rem' }}>
-          <GlassCard style={{ padding: '0.9rem' }}>
+          <Card style={{ padding: '0.9rem' }}>
             <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '0.5rem' }}>
               Groups
             </div>
@@ -281,15 +282,15 @@ const SplitsPage = () => {
                   style={{
                     textAlign: 'left',
                     padding: '0.75rem',
-                    borderRadius: 14,
+                    borderRadius: 'var(--radius-md, 12px)',
                     border:
                       selectedGroup?._id === group._id
-                        ? '1px solid rgba(79,142,247,0.65)'
-                        : '1px solid var(--glass-border)',
+                        ? '1px solid var(--color-accent)'
+                        : '1px solid var(--border-color)',
                     background:
                       selectedGroup?._id === group._id
-                        ? 'rgba(79,142,247,0.18)'
-                        : 'rgba(255,255,255,0.03)',
+                        ? 'var(--color-accent-subtle)'
+                        : 'var(--bg-surface-elevated)',
                     color: 'var(--text-primary)',
                     cursor: 'pointer',
                   }}
@@ -301,118 +302,240 @@ const SplitsPage = () => {
                 </button>
               ))}
             </div>
-          </GlassCard>
+          </Card>
 
           {selectedGroup && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <GlassCard style={{ padding: '1rem 1.2rem' }}>
+              {/* Trip / Group Header Card */}
+              <Card style={{ padding: '1.25rem 1.4rem' }}>
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     gap: '1rem',
                     alignItems: 'flex-start',
+                    flexWrap: 'wrap',
                   }}
                 >
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{selectedGroup.name}</h2>
-                    <p className="text-muted" style={{ fontSize: '0.8rem' }}>
-                      Your synced split share is counted in Transactions, Budgets, and Analytics.
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>{selectedGroup.isTrip ? '✈️' : '👥'}</span>
+                      <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {selectedGroup.name}
+                      </h2>
+                      {selectedGroup.isTrip && (
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 'var(--radius-full)',
+                            background: 'var(--color-positive-bg)',
+                            color: 'var(--color-positive)',
+                            border: '1px solid var(--color-positive-border)',
+                          }}
+                        >
+                          Trip Active
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Member Avatars Row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '0.65rem' }}>
+                      <div style={{ display: 'flex', marginLeft: '6px' }}>
+                        {selectedGroup.members.map((m, idx) => (
+                          <div
+                            key={m._id || m.name}
+                            title={`${m.name} (${m.email || 'No email'})`}
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              background: 'var(--bg-surface-elevated)',
+                              border: '2px solid var(--bg-surface)',
+                              color: 'var(--accent-primary-light)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              marginLeft: idx === 0 ? 0 : '-8px',
+                              boxShadow: 'var(--shadow-xs)',
+                            }}
+                          >
+                            {(m.name || '?')[0].toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                        {selectedGroup.members.length} members &bull; Total spent:{' '}
+                        <strong className="num-tabular" style={{ color: 'var(--text-primary)' }}>
+                          ₹{selectedGroup.expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0).toLocaleString('en-IN')}
+                        </strong>
+                      </span>
+                    </div>
                   </div>
+
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button type="button" className="btn-primary" onClick={openExpenseModal}>
                       + Expense
                     </button>
                     <button
                       type="button"
-                      className="btn-primary"
+                      className="btn-secondary"
                       onClick={() => openSettlementModal()}
                     >
-                      Settle
+                      Record Settle
                     </button>
                     <button
                       type="button"
                       onClick={handleDeleteGroup}
                       style={{
-                        border: '1px solid rgba(255,107,107,0.45)',
-                        background: 'rgba(255,107,107,0.08)',
-                        color: 'var(--accent-red)',
-                        borderRadius: 999,
-                        padding: '0.75rem 1rem',
+                        border: '1px solid rgba(244, 63, 94, 0.3)',
+                        background: 'var(--color-negative-bg)',
+                        color: 'var(--color-negative)',
+                        borderRadius: 'var(--radius-md, 12px)',
+                        padding: '6px 12px',
                         cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
                       }}
                     >
                       Delete
                     </button>
                   </div>
                 </div>
-              </GlassCard>
+              </Card>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
-                <GlassCard style={{ padding: '1rem 1.2rem' }}>
-                  <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Balances</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              {/* Balances & Simplified Debts with Settle via UPI */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                <Card style={{ padding: '1.2rem 1.3rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Member Balances</h3>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Net balance</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                     {selectedGroup.memberBalances.map((member) => (
                       <div
                         key={member.memberId}
-                        style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '6px 0',
+                          borderBottom: '1px solid var(--divider-color)',
+                        }}
                       >
-                        <span>{member.name}</span>
-                        <strong
-                          style={{
-                            color:
-                              member.balance > 0
-                                ? 'var(--accent-teal)'
-                                : member.balance < 0
-                                ? 'var(--accent-red)'
-                                : 'var(--text-muted)',
-                          }}
-                        >
-                          {currency(member.balance)}
-                        </strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '50%',
+                              background: 'var(--bg-surface-elevated)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
+                            {(member.name || '?')[0].toUpperCase()}
+                          </div>
+                          <span style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {member.name}
+                          </span>
+                        </div>
+                        <BalanceChip amount={member.balance} />
                       </div>
                     ))}
                   </div>
-                </GlassCard>
+                </Card>
 
-                <GlassCard style={{ padding: '1rem 1.2rem' }}>
-                  <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Who owes whom</h3>
+                <Card style={{ padding: '1.2rem 1.3rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Who Owes Whom</h3>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Simplified settlement</span>
+                  </div>
                   {selectedGroup.simplifiedDebts.length === 0 ? (
-                    <p className="text-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-                      Everyone is settled.
-                    </p>
+                    <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--color-positive)', fontSize: '0.85rem' }}>
+                      ✓ Everyone is completely settled!
+                    </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      {selectedGroup.simplifiedDebts.map((debt) => (
-                        <div
-                          key={`${debt.from}-${debt.to}-${debt.amount}`}
-                          style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}
-                        >
-                          <span>
-                            {debt.fromName} owes {debt.toName}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => openSettlementModal(debt)}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {selectedGroup.simplifiedDebts.map((debt) => {
+                        const upiPayUrl = `upi://pay?pn=${encodeURIComponent(debt.toName)}&am=${debt.amount}&cu=INR&tn=${encodeURIComponent(`FinSight - ${selectedGroup.name}`)}`;
+                        return (
+                          <div
+                            key={`${debt.from}-${debt.to}-${debt.amount}`}
                             style={{
-                              border: 'none',
-                              background: 'transparent',
-                              color: 'var(--accent-blue)',
-                              cursor: 'pointer',
-                              fontWeight: 600,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '8px 10px',
+                              borderRadius: 'var(--radius-sm, 8px)',
+                              background: 'var(--bg-surface-elevated)',
+                              border: '1px solid var(--border-color)',
+                              flexWrap: 'wrap',
+                              gap: '8px',
                             }}
                           >
-                            {currency(debt.amount)}
-                          </button>
-                        </div>
-                      ))}
+                            <div>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {debt.fromName} owes {debt.toName}
+                              </div>
+                              <div className="num-tabular" style={{ fontSize: '0.8rem', color: 'var(--color-negative)', fontWeight: 700 }}>
+                                ₹{Number(debt.amount).toLocaleString('en-IN')}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <a
+                                href={upiPayUrl}
+                                onClick={() => openSettlementModal(debt)}
+                                title="Open UPI app (Google Pay, PhonePe, Paytm) to settle directly"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '5px 10px',
+                                  background: 'linear-gradient(135deg, #10B981, #059669)',
+                                  color: '#FFFFFF',
+                                  borderRadius: 'var(--radius-sm, 8px)',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  textDecoration: 'none',
+                                  boxShadow: 'var(--shadow-xs)',
+                                }}
+                              >
+                                ⚡ Settle via UPI
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => openSettlementModal(debt)}
+                                style={{
+                                  padding: '5px 8px',
+                                  background: 'transparent',
+                                  border: '1px solid var(--border-strong)',
+                                  color: 'var(--text-secondary)',
+                                  borderRadius: 'var(--radius-sm, 8px)',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Record
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                </GlassCard>
+                </Card>
               </div>
 
-              <GlassCard style={{ padding: '1rem 1.2rem' }}>
+              <Card style={{ padding: '1.25rem 1.4rem' }}>
                 <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Shared expenses</h3>
                 {selectedGroup.expenses.length === 0 ? (
                   <p className="text-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
@@ -460,7 +583,7 @@ const SplitsPage = () => {
                     </table>
                   </div>
                 )}
-              </GlassCard>
+              </Card>
             </div>
           )}
         </div>

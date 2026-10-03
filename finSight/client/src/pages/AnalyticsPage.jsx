@@ -14,10 +14,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import GlassCard from '../components/GlassCard.jsx';
+import Card from '../components/Card.jsx';
 import api from '../api/axios.js';
 
-const COLORS = ['#242548', '#525577', '#9C919F', '#C3AAA4'];
+const COLORS = ['#6366F1', '#10B981', '#F43F5E', '#F59E0B', '#818CF8', '#14B8A6'];
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -37,47 +37,49 @@ const gradeCopy = (grade) => {
   return 'Add more income, expenses, budgets, and goals for a useful score.';
 };
 
-const Panel = ({ title, subtitle, action, children, style }) => (
-  <GlassCard style={{ padding: '1rem 1.15rem', ...style }}>
+const Panel = ({ title, takeaway, subtitle, action, children, style }) => (
+  <Card style={{ padding: '1.25rem 1.4rem', ...style }}>
     <div
       style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         gap: '1rem',
-        marginBottom: '0.85rem',
+        marginBottom: '1rem',
       }}
     >
       <div>
-        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 650 }}>{title}</h2>
-        {subtitle && (
-          <p className="text-muted" style={{ margin: '0.25rem 0 0', fontSize: '0.78rem' }}>
-            {subtitle}
+        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          {title}
+        </h3>
+        {(takeaway || subtitle) && (
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            {takeaway || subtitle}
           </p>
         )}
       </div>
       {action}
     </div>
     {children}
-  </GlassCard>
+  </Card>
 );
 
 const MetricCard = ({ label, value, helper, tone = 'neutral' }) => {
   const color =
-    tone === 'good' ? 'var(--accent-teal)' : tone === 'bad' ? 'var(--accent-red)' : 'var(--text-primary)';
+    tone === 'good' ? 'var(--color-positive)' : tone === 'bad' ? 'var(--color-negative)' : 'var(--text-primary)';
 
   return (
-    <GlassCard style={{ padding: '0.95rem 1rem', minHeight: 112 }}>
-      <div className="text-muted" style={{ fontSize: '0.74rem', textTransform: 'uppercase' }}>
+    <Card style={{ padding: '1rem 1.15rem', minHeight: 110 }}>
+      <div className="text-muted" style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
         {label}
       </div>
-      <div style={{ marginTop: '0.45rem', fontSize: '1.45rem', fontWeight: 700, color }}>
+      <div className="num-tabular" style={{ marginTop: '0.4rem', fontSize: '1.45rem', fontWeight: 700, color }}>
         {value}
       </div>
-      <div className="text-muted" style={{ marginTop: '0.35rem', fontSize: '0.78rem' }}>
+      <div className="text-muted" style={{ marginTop: '0.3rem', fontSize: '0.76rem' }}>
         {helper}
       </div>
-    </GlassCard>
+    </Card>
   );
 };
 
@@ -92,8 +94,8 @@ const EmptyState = ({ children }) => (
       textAlign: 'center',
       fontSize: '0.85rem',
       border: '1px dashed var(--border-color)',
-      borderRadius: 12,
-      background: 'var(--bg-light)',
+      borderRadius: 'var(--radius-md, 12px)',
+      background: 'var(--bg-surface-elevated)',
       padding: '1rem',
     }}
   >
@@ -107,11 +109,11 @@ const CustomTooltip = ({ active, payload, label }) => {
   return (
     <div
       style={{
-        background: 'var(--accent-primary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-md)',
-        padding: '0.7rem 0.8rem',
-        color: 'var(--bg-primary)',
+        background: 'var(--bg-surface-elevated)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: 'var(--radius-md, 12px)',
+        padding: '0.7rem 0.85rem',
+        color: 'var(--text-primary)',
         boxShadow: 'var(--shadow-md)',
       }}
     >
@@ -119,7 +121,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         {label}
       </div>
       {payload.map((item) => (
-        <div key={item.dataKey || item.name} style={{ fontSize: '0.82rem', color: 'var(--bg-primary)' }}>
+        <div key={item.dataKey || item.name} className="num-tabular" style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>
           <span style={{ color: item.color, marginRight: 6 }}>●</span>
           {item.name || item.dataKey}: {money(item.value)}
         </div>
@@ -305,8 +307,8 @@ const AnalyticsPage = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
         <Panel
-          title="Financial health"
-          subtitle="A single score from savings, budgets, goals, consistency, and buffer."
+          title="Financial Health"
+          takeaway={`Grade ${grade} — ${gradeCopy(grade)}`}
           style={{ minHeight: 350 }}
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'center' }}>
@@ -315,10 +317,10 @@ const AnalyticsPage = () => {
                 width: 148,
                 height: 148,
                 borderRadius: '50%',
-                background: `conic-gradient(var(--accent-teal) ${healthScore * 3.6}deg, var(--chart-track-color, rgba(156, 145, 159, 0.15)) 0deg)`,
+                background: `conic-gradient(var(--color-positive) ${healthScore * 3.6}deg, var(--border-color) 0deg)`,
                 display: 'grid',
                 placeItems: 'center',
-                boxShadow: 'var(--shadow-md)',
+                boxShadow: 'var(--shadow-sm)',
               }}
             >
               <div
@@ -326,21 +328,21 @@ const AnalyticsPage = () => {
                   width: 118,
                   height: 118,
                   borderRadius: '50%',
-                  background: 'var(--chart-center-bg, #E5DDD8)',
+                  background: 'var(--bg-surface-elevated)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  border: '1px solid var(--border-color, rgba(156, 145, 159, 0.15))',
+                  border: '1px solid var(--border-strong)',
                 }}
               >
-                <div style={{ fontSize: '2rem', fontWeight: 750, color: 'var(--text-primary)' }}>
+                <div className="num-tabular" style={{ fontSize: '2rem', fontWeight: 750, color: 'var(--text-primary)' }}>
                   {loading ? '-' : healthScore}
                 </div>
                 <div className="text-muted" style={{ fontSize: '0.75rem' }}>
                   out of 100
                 </div>
-                <div style={{ marginTop: '0.25rem', color: 'var(--accent-teal)', fontSize: '0.8rem' }}>
+                <div style={{ marginTop: '0.25rem', color: 'var(--color-positive)', fontSize: '0.8rem', fontWeight: 600 }}>
                   Grade {grade}
                 </div>
               </div>
@@ -351,10 +353,10 @@ const AnalyticsPage = () => {
                 style={{
                   color:
                     scoreTone === 'good'
-                      ? 'var(--accent-teal)'
+                      ? 'var(--color-positive)'
                       : scoreTone === 'bad'
-                      ? 'var(--accent-red)'
-                      : 'var(--accent-warning)',
+                      ? 'var(--color-negative)'
+                      : 'var(--color-warning)',
                   fontWeight: 700,
                   marginBottom: '0.35rem',
                 }}
@@ -374,14 +376,14 @@ const AnalyticsPage = () => {
                 <div key={key}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
                     <span>{formatBreakdownLabel(key)}</span>
-                    <span className="text-muted">{value}/100</span>
+                    <span className="text-muted num-tabular">{value}/100</span>
                   </div>
                   <div
                     style={{
                       height: 7,
                       marginTop: '0.25rem',
                       borderRadius: 999,
-                      background: 'var(--chart-track-color, rgba(156, 145, 159, 0.15))',
+                      background: 'var(--border-color)',
                       overflow: 'hidden',
                     }}
                   >
@@ -390,7 +392,7 @@ const AnalyticsPage = () => {
                         width: `${Math.max(0, Math.min(100, value))}%`,
                         height: '100%',
                         borderRadius: 999,
-                        background: value >= 70 ? 'var(--accent-teal)' : value >= 40 ? 'var(--accent-warning)' : 'var(--accent-red)',
+                        background: value >= 70 ? 'var(--color-positive)' : value >= 40 ? 'var(--color-warning)' : 'var(--color-negative)',
                       }}
                     />
                   </div>
@@ -400,8 +402,14 @@ const AnalyticsPage = () => {
         </Panel>
 
         <Panel
-          title="Monthly income vs expense"
-          subtitle="Compare how much came in and how much went out across recent months."
+          title="Monthly Income vs Expense"
+          takeaway={
+            monthlyChartData.length > 0
+              ? netSavings >= 0
+                ? `Net surplus of ${money(netSavings)} saved this month`
+                : `Net deficit of ${money(Math.abs(netSavings))} this month`
+              : 'Add transactions to see your monthly comparison'
+          }
           style={{ minHeight: 350 }}
         >
           {monthlyChartData.length === 0 ? (
@@ -409,13 +417,13 @@ const AnalyticsPage = () => {
           ) : (
             <ResponsiveContainer width="100%" height={270}>
               <LineChart data={monthlyChartData} margin={{ top: 10, right: 18, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(156, 145, 159, 0.15)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                 <XAxis dataKey="label" stroke="var(--text-muted)" tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} tickFormatter={money} width={68} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Line type="monotone" dataKey="income" name="Income" stroke="#242548" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
-                <Line type="monotone" dataKey="expense" name="Expense" stroke="#C3AAA4" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
+                <Line type="monotone" dataKey="income" name="Income (+)" stroke="#10B981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} animationDuration={250} />
+                <Line type="monotone" dataKey="expense" name="Expense (−)" stroke="#F43F5E" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} animationDuration={250} />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -424,8 +432,12 @@ const AnalyticsPage = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
         <Panel
-          title="Category breakdown"
-          subtitle="Where this month of spending is concentrated."
+          title="Category Breakdown"
+          takeaway={
+            topCategory
+              ? `${topCategory.category} is your highest spend: ${money(topCategory.total)} (${categoryTotal > 0 ? ((topCategory.total / categoryTotal) * 100).toFixed(0) : 0}%)`
+              : 'Where this month of spending is concentrated'
+          }
           style={{ minHeight: 360 }}
         >
           {categoryData.length === 0 ? (
@@ -441,6 +453,7 @@ const AnalyticsPage = () => {
                     innerRadius={62}
                     outerRadius={100}
                     paddingAngle={3}
+                    animationDuration={250}
                   >
                     {categoryData.map((entry, index) => (
                       <Cell key={entry.category} fill={COLORS[index % COLORS.length]} />
@@ -460,9 +473,9 @@ const AnalyticsPage = () => {
                           <span style={{ color: COLORS[index % COLORS.length], marginRight: 6 }}>●</span>
                           {item.category}
                         </span>
-                        <span>{money(item.total)}</span>
+                        <span className="num-tabular" style={{ fontWeight: 600 }}>{money(item.total)}</span>
                       </div>
-                      <div className="text-muted" style={{ fontSize: '0.74rem', marginTop: '0.1rem' }}>
+                      <div className="text-muted num-tabular" style={{ fontSize: '0.74rem', marginTop: '0.1rem' }}>
                         {percent.toFixed(0)}% of tracked spending
                       </div>
                     </div>
@@ -474,12 +487,16 @@ const AnalyticsPage = () => {
         </Panel>
 
         <Panel
-          title="Mood vs spending"
-          subtitle="See whether certain spending is tied to mood labels."
+          title="Mood vs Spending"
+          takeaway={
+            highestMood.total > 0
+              ? `Highest spending occurred when feeling ${highestMood.mood} (${money(highestMood.total)})`
+              : 'See whether certain spending is tied to emotion'
+          }
           action={
             highestMood.total > 0 ? (
               <span className="badge badge-positive" style={{ textTransform: 'none', letterSpacing: 0 }}>
-                Highest: {highestMood.mood}
+                Peak: {highestMood.mood}
               </span>
             ) : null
           }
@@ -493,29 +510,29 @@ const AnalyticsPage = () => {
                 const percent = moodTotal > 0 ? (item.total / moodTotal) * 100 : 0;
                 const tone =
                   item.mood === 'Happy'
-                    ? 'var(--accent-teal)'
+                    ? 'var(--color-positive)'
                     : item.mood === 'Stressed'
-                    ? 'var(--accent-red)'
-                    : 'var(--accent-blue)';
+                    ? 'var(--color-negative)'
+                    : 'var(--color-accent)';
 
                 return (
                   <div key={item.mood}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem' }}>
                       <span>{item.mood}</span>
-                      <strong>{money(item.total)}</strong>
+                      <strong className="num-tabular">{money(item.total)}</strong>
                     </div>
                     <div
                       style={{
                         height: 9,
                         marginTop: '0.35rem',
                         borderRadius: 999,
-                        background: 'rgba(156, 145, 159, 0.15)',
+                        background: 'var(--border-color)',
                         overflow: 'hidden',
                       }}
                     >
                       <div style={{ width: `${percent}%`, height: '100%', borderRadius: 999, background: tone }} />
                     </div>
-                    <div className="text-muted" style={{ fontSize: '0.74rem', marginTop: '0.2rem' }}>
+                    <div className="text-muted num-tabular" style={{ fontSize: '0.74rem', marginTop: '0.2rem' }}>
                       {percent.toFixed(0)}% of mood-tagged spending
                     </div>
                   </div>
@@ -528,8 +545,12 @@ const AnalyticsPage = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
         <Panel
-          title="Spending by day"
-          subtitle="Which day of the week usually costs the most."
+          title="Spending by Day"
+          takeaway={
+            busiestDay.total > 0
+              ? `Spending peaks on ${busiestDay.fullDay}s at ${money(busiestDay.total)}`
+              : 'Which day of the week usually costs the most'
+          }
           action={
             busiestDay.total > 0 ? (
               <span className="badge badge-positive" style={{ textTransform: 'none', letterSpacing: 0 }}>
@@ -544,19 +565,23 @@ const AnalyticsPage = () => {
           ) : (
             <ResponsiveContainer width="100%" height={230}>
               <BarChart data={spendingPatternData} margin={{ top: 10, right: 18, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(156, 145, 159, 0.15)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                 <XAxis dataKey="day" stroke="var(--text-muted)" tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} tickFormatter={money} width={68} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="total" name="Spent" fill="var(--accent-primary)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="total" name="Spent" fill="var(--color-accent)" radius={[6, 6, 0, 0]} animationDuration={250} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </Panel>
 
         <Panel
-          title="Detected subscriptions"
-          subtitle="Repeated similar expenses from the last six months."
+          title="Detected Subscriptions"
+          takeaway={
+            subscriptions.length > 0
+              ? `${subscriptions.length} recurring services totaling ${money(subscriptions.reduce((sum, s) => sum + s.estimatedMonthlyCost, 0))}/month`
+              : 'Repeated similar expenses from recent months'
+          }
           style={{ minHeight: 320 }}
         >
           {loading ? (
@@ -573,7 +598,7 @@ const AnalyticsPage = () => {
                     justifyContent: 'space-between',
                     gap: '1rem',
                     padding: '0.75rem 0',
-                    borderBottom: '1px solid var(--divider-color)',
+                    borderBottom: '1px solid var(--border-color)',
                   }}
                 >
                   <div>
@@ -582,7 +607,7 @@ const AnalyticsPage = () => {
                       {subscription.occurrences} similar charges detected
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', color: 'var(--accent-blue)', fontWeight: 700 }}>
+                  <div className="num-tabular" style={{ textAlign: 'right', color: 'var(--color-accent)', fontWeight: 700 }}>
                     {money(subscription.estimatedMonthlyCost)}
                     <div className="text-muted" style={{ fontSize: '0.72rem', fontWeight: 400 }}>
                       monthly est.

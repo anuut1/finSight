@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import GlassCard from '../components/GlassCard.jsx';
+import Card from '../components/Card.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
@@ -128,10 +128,12 @@ const TransactionsPage = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: '1.25rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.6rem' }}>Transactions</h1>
+          <h1 style={{ margin: 0, fontSize: '1.65rem', fontWeight: 700 }}>Transactions</h1>
           <p className="text-muted" style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
             Search, filter, and manage every income and expense line.
           </p>
@@ -163,8 +165,8 @@ const TransactionsPage = () => {
 
       <NaturalLanguageQuickAdd onTransactionCreated={() => fetchTransactions()} />
 
-      <GlassCard style={{ padding: '0.9rem 1.1rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+      <Card style={{ padding: '1rem 1.25rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <select
             name="type"
             value={filters.type}
@@ -173,8 +175,8 @@ const TransactionsPage = () => {
             style={{ flex: '1 1 120px' }}
           >
             <option value="">All types</option>
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
+            <option value="income">Income (+)</option>
+            <option value="expense">Expense (−)</option>
           </select>
           <input
             name="category"
@@ -190,7 +192,8 @@ const TransactionsPage = () => {
             value={filters.startDate}
             onChange={handleChangeFilter}
             className="input-glass"
-            style={{ flex: '1 1 150px' }}
+            style={{ flex: '1 1 140px' }}
+            aria-label="Start date"
           />
           <input
             type="date"
@@ -198,7 +201,8 @@ const TransactionsPage = () => {
             value={filters.endDate}
             onChange={handleChangeFilter}
             className="input-glass"
-            style={{ flex: '1 1 150px' }}
+            style={{ flex: '1 1 140px' }}
+            aria-label="End date"
           />
           <button
             type="button"
@@ -206,121 +210,164 @@ const TransactionsPage = () => {
             style={{ flex: '0 0 auto' }}
             onClick={applyFilters}
           >
-            Apply filters
+            Filter
           </button>
         </div>
-      </GlassCard>
+      </Card>
 
-      <GlassCard style={{ padding: '1rem 1.2rem' }}>
+      <Card style={{ padding: '1.25rem 1.4rem' }}>
         <div style={{ overflowX: 'auto' }}>
           <table
             style={{
               width: '100%',
               borderCollapse: 'collapse',
-              fontSize: '0.85rem',
+              fontSize: '0.86rem',
             }}
           >
             <thead>
-              <tr style={{ color: 'var(--text-muted)' }}>
-                <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Date</th>
-                <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Description</th>
-                <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Category</th>
-                <th style={{ textAlign: 'right', paddingBottom: '0.5rem' }}>Amount</th>
-                <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Mood</th>
-                <th style={{ textAlign: 'right', paddingBottom: '0.5rem' }}>Actions</th>
+              <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ textAlign: 'left', paddingBottom: '0.65rem' }}>Date</th>
+                <th style={{ textAlign: 'left', paddingBottom: '0.65rem' }}>Description</th>
+                <th style={{ textAlign: 'left', paddingBottom: '0.65rem' }}>Category</th>
+                <th style={{ textAlign: 'right', paddingBottom: '0.65rem' }}>Amount</th>
+                <th style={{ textAlign: 'left', paddingBottom: '0.65rem', paddingLeft: '1rem' }}>Mood</th>
+                <th style={{ textAlign: 'right', paddingBottom: '0.65rem' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan="6" style={{ padding: '0.75rem 0' }} className="text-muted">
+                  <td colSpan="6" style={{ padding: '1.25rem 0', textAlign: 'center' }} className="text-muted">
                     Loading transactions...
                   </td>
                 </tr>
               )}
               {error && !loading && (
                 <tr>
-                  <td colSpan="6" style={{ padding: '0.75rem 0' }} className="text-muted">
+                  <td colSpan="6" style={{ padding: '1.25rem 0', textAlign: 'center', color: 'var(--color-negative)' }}>
                     {error}
                   </td>
                 </tr>
               )}
               {!loading && !error && items.length === 0 && (
                 <tr>
-                  <td colSpan="6" style={{ padding: '0.75rem 0' }} className="text-muted">
+                  <td colSpan="6" style={{ padding: '1.5rem 0', textAlign: 'center' }} className="text-muted">
                     No transactions found.
                   </td>
                 </tr>
               )}
-              {items.map((t) => (
-                <tr key={t._id}>
-                  <td style={{ padding: '0.5rem 0', whiteSpace: 'nowrap' }}>
-                    {new Date(t.date).toLocaleDateString()}
-                  </td>
-                  <td style={{ padding: '0.5rem 0' }}>{t.description || '—'}</td>
-                  <td style={{ padding: '0.5rem 0' }}>{t.category}</td>
-                  <td
+              {items.map((t) => {
+                const isIncome = t.type === 'income';
+                return (
+                  <tr
+                    key={t._id}
                     style={{
-                      padding: '0.5rem 0',
-                      textAlign: 'right',
-                      color:
-                        t.type === 'income' ? 'var(--accent-teal)' : 'var(--accent-red)',
+                      borderBottom: '1px solid var(--divider-color)',
+                      transition: 'background var(--transition-fast)',
                     }}
                   >
-                    {t.type === 'income' ? '+' : '-'}₹{t.amount.toFixed(0)}
-                  </td>
-                  <td style={{ padding: '0.5rem 0' }}>
-                    <span
-                      className="badge"
+                    <td style={{ padding: '0.65rem 0', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                      {new Date(t.date).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '0.65rem 0', fontWeight: 500, color: 'var(--text-primary)' }}>
+                      {t.description || '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0' }}>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-sm, 8px)',
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        {t.category}
+                      </span>
+                    </td>
+                    <td
+                      className="num-tabular"
                       style={{
-                        background:
-                          t.mood === 'happy'
-                            ? 'rgba(0,212,170,0.1)'
-                            : t.mood === 'stressed'
-                            ? 'rgba(255,107,107,0.1)'
-                            : 'rgba(255,255,255,0.05)',
-                        color:
-                          t.mood === 'happy'
-                            ? 'var(--accent-teal)'
-                            : t.mood === 'stressed'
-                            ? 'var(--accent-red)'
-                            : 'var(--text-muted)',
+                        padding: '0.65rem 0',
+                        textAlign: 'right',
+                        fontWeight: 700,
+                        fontSize: '0.92rem',
+                        color: isIncome ? 'var(--color-positive)' : 'var(--color-negative)',
                       }}
                     >
-                      {t.mood ? t.mood.charAt(0).toUpperCase() + t.mood.slice(1) : 'Neutral'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(t)}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--accent-blue)',
-                        cursor: 'pointer',
-                        marginRight: '0.5rem',
-                        fontSize: '0.8rem',
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(t._id)}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--accent-red)',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      {isIncome ? '+ ₹' : '− ₹'}{Number(t.amount || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td style={{ padding: '0.65rem 0', paddingLeft: '1rem' }}>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-full)',
+                          background:
+                            t.mood === 'happy'
+                              ? 'var(--color-positive-bg)'
+                              : t.mood === 'stressed'
+                              ? 'var(--color-negative-bg)'
+                              : 'var(--bg-surface-elevated)',
+                          color:
+                            t.mood === 'happy'
+                              ? 'var(--color-positive)'
+                              : t.mood === 'stressed'
+                              ? 'var(--color-negative)'
+                              : 'var(--text-muted)',
+                          border: `1px solid ${
+                            t.mood === 'happy'
+                              ? 'var(--color-positive-border)'
+                              : t.mood === 'stressed'
+                              ? 'var(--color-negative-border)'
+                              : 'var(--border-color)'
+                          }`,
+                        }}
+                      >
+                        {t.mood ? t.mood.charAt(0).toUpperCase() + t.mood.slice(1) : 'Neutral'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.65rem 0', textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(t)}
+                        style={{
+                          border: '1px solid var(--border-color)',
+                          background: 'transparent',
+                          color: 'var(--color-accent)',
+                          cursor: 'pointer',
+                          marginRight: '0.5rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-sm, 8px)',
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(t._id)}
+                        style={{
+                          border: '1px solid rgba(244, 63, 94, 0.25)',
+                          background: 'transparent',
+                          color: 'var(--color-negative)',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-sm, 8px)',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -330,35 +377,39 @@ const TransactionsPage = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginTop: '0.75rem',
+            marginTop: '1rem',
+            paddingTop: '0.75rem',
+            borderTop: '1px solid var(--border-color)',
             fontSize: '0.8rem',
           }}
         >
-          <span className="text-muted">
+          <span className="text-muted num-tabular">
             Page {pagination.page} of {pagination.pages || 1}
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
               type="button"
-              className="btn-primary"
+              className="btn-secondary"
               disabled={pagination.page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
+              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
             >
               Previous
             </button>
             <button
               type="button"
-              className="btn-primary"
+              className="btn-secondary"
               disabled={pagination.page >= (pagination.pages || 1)}
               onClick={() =>
                 setPage((p) => (pagination.pages ? Math.min(pagination.pages, p + 1) : p + 1))
               }
+              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
             >
               Next
             </button>
           </div>
         </div>
-      </GlassCard>
+      </Card>
 
       <Modal
         title={editing ? 'Edit transaction' : 'Add transaction'}

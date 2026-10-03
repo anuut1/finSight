@@ -44,108 +44,82 @@ const RegisterPage = () => {
   return (
     <div className="register-container">
       <div className="login-form-container" style={{ maxWidth: 460 }}>
-        <div style={{ marginBottom: '1.25rem' }}>
-          <div
-            style={{
-              fontSize: '0.8rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: 'var(--text-muted)',
-              marginBottom: '0.3rem',
-            }}
-          >
-            Get started
-          </div>
-          <h1 style={{ margin: 0, fontSize: '1.6rem' }}>Create your FinSight account</h1>
-          <p className="text-muted" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-            Track cash flow, budgets, and long‑term goals with a clean, glass dashboard.
-          </p>
+        <div className="login-header" style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
+          <div className="login-logo" style={{ fontSize: '1.5rem' }}>FS</div>
+          <h2>Create your Account</h2>
+          <p>Track cash flow, budgets, and group splits in one calm dashboard.</p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
-        >
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-              Name
-            </label>
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group-login">
+            <label htmlFor="reg-name">Full Name</label>
             <input
+              id="reg-name"
               name="name"
               value={form.name}
               onChange={handleChange}
-              className="input-glass"
-              placeholder="Your name"
+              placeholder="e.g. Alex Sharma"
+              required
+              disabled={loading}
             />
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-              Email
-            </label>
+
+          <div className="form-group-login">
+            <label htmlFor="reg-email">Email Address</label>
             <input
+              id="reg-email"
               name="email"
               type="email"
               value={form.email}
               onChange={handleChange}
-              className="input-glass"
               placeholder="you@example.com"
+              required
+              disabled={loading}
             />
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-                Password
-              </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group-login">
+              <label htmlFor="reg-password">Password</label>
               <input
+                id="reg-password"
                 name="password"
                 type="password"
                 value={form.password}
                 onChange={handleChange}
-                className="input-glass"
-                placeholder="Create a password"
+                placeholder="••••••••"
+                required
+                disabled={loading}
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-                Confirm password
-              </label>
+            <div className="form-group-login">
+              <label htmlFor="reg-confirm">Confirm</label>
               <input
+                id="reg-confirm"
                 name="confirmPassword"
                 type="password"
                 value={form.confirmPassword}
                 onChange={handleChange}
-                className="input-glass"
-                placeholder="Repeat password"
+                placeholder="••••••••"
+                required
+                disabled={loading}
               />
             </div>
           </div>
-          {error && (
-            <div
-              style={{
-                background: 'rgba(255, 107, 107, 0.1)',
-                borderRadius: 999,
-                padding: '0.5rem 0.9rem',
-                fontSize: '0.8rem',
-                color: 'var(--accent-red)',
-              }}
-            >
-              {error}
-            </div>
-          )}
-          <button className="btn-primary" type="submit" disabled={loading}>
-            {loading ? 'Creating account...' : 'Create account'}
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button className="login-button" type="submit" disabled={loading}>
+            {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        <p
-          className="text-muted"
-          style={{ marginTop: '1rem', fontSize: '0.8rem', textAlign: 'center' }}
-        >
+        <div className="login-footer">
           Already have an account?{' '}
-          <Link to="/login" style={{ color: 'var(--accent-blue)' }}>
+          <Link to="/login">
             Sign in
           </Link>
-        </p>
+        </div>
       </div>
     </div>
   );
