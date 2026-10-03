@@ -630,6 +630,10 @@ tbody tr:hover {
   .app-shell > main {
     padding: var(--spacing-lg);
   }
+
+  .dashboard-main-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @media (max-width: 480px) {

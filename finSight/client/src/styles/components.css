@@ -1,3 +1,21 @@
+/* ==================== SKELETON LOADER ==================== */
+@keyframes skeletonShimmer {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.skeleton-pulse {
+  background: var(--bg-surface-elevated, #1B243B);
+  background-size: 200% 100%;
+}
+
 /* ==================== STAT CARD ==================== */
 .stat-card {
   background: var(--bg-secondary);

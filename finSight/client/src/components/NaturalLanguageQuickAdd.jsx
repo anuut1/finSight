@@ -24,8 +24,8 @@ const SAMPLE_PROMPTS = [
   'salary 75000 credited',
 ];
 
-const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
-  const [input, setInput] = useState('');
+const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initialText = '' }) => {
+  const [input, setInput] = useState(initialText);
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState('');
   const [draft, setDraft] = useState(null); // The editable confirmation card state
