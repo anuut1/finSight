@@ -3,6 +3,7 @@ import GlassCard from '../components/GlassCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
+import BankAlertImportModal from '../components/BankAlertImportModal.jsx';
 import api from '../api/axios.js';
 
 const TransactionsPage = () => {
@@ -18,6 +19,7 @@ const TransactionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [smsModalOpen, setSmsModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -131,9 +133,19 @@ const TransactionsPage = () => {
             Search, filter, and manage every income and expense line.
           </p>
         </div>
-        <button type="button" className="btn-primary" onClick={openNewModal}>
-          + Add transaction
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setSmsModalOpen(true)}
+            style={{ fontSize: '0.85rem' }}
+          >
+            📨 Paste Bank SMS
+          </button>
+          <button type="button" className="btn-primary" onClick={openNewModal}>
+            + Add transaction
+          </button>
+        </div>
       </div>
 
       <NaturalLanguageQuickAdd onTransactionCreated={() => fetchTransactions()} />
@@ -342,6 +354,12 @@ const TransactionsPage = () => {
       >
         <TransactionForm initialValues={editing} onSubmit={handleSave} submitting={saving} />
       </Modal>
+
+      <BankAlertImportModal
+        isOpen={smsModalOpen}
+        onClose={() => setSmsModalOpen(false)}
+        onTransactionCreated={() => fetchTransactions()}
+      />
     </>
   );
 };

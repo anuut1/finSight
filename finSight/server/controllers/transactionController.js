@@ -1,6 +1,7 @@
 const Transaction = require('../models/Transaction');
 const SplitGroup = require('../models/SplitGroup');
 const { parseNaturalLanguageInput } = require('../services/quickAddParser');
+const { parseBankAlert } = require('../services/bankAlertParser');
 
 exports.getTransactions = async (req, res) => {
   try {
@@ -190,6 +191,25 @@ exports.parseQuickAdd = async (req, res) => {
   } catch (err) {
     console.error('Quick add parsing error:', err);
     return res.status(500).json({ success: false, message: 'Failed to parse natural language input' });
+  }
+};
+
+exports.parseBankAlertEndpoint = async (req, res) => {
+  try {
+    const { text, currentDate } = req.body;
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'Bank alert or SMS text is required' });
+    }
+
+    const parsed = await parseBankAlert(text, {
+      currentDate,
+      user: req.user,
+    });
+
+    return res.json({ success: true, data: parsed });
+  } catch (err) {
+    console.error('Bank alert parsing error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to parse bank alert' });
   }
 };
 

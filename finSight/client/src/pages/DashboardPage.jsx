@@ -6,6 +6,7 @@ import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
 import TripModeWidget from '../components/TripModeWidget.jsx';
 import RecurringTemplatesWidget from '../components/RecurringTemplatesWidget.jsx';
+import BankAlertBox from '../components/BankAlertBox.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import api from '../api/axios.js';
 import { useState } from 'react';
@@ -267,7 +268,7 @@ const DashboardPage = () => {
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
       >
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <button
             type="button"
             className={modalTab === 'nl' ? 'btn-primary' : 'btn-secondary'}
@@ -275,6 +276,14 @@ const DashboardPage = () => {
             onClick={() => setModalTab('nl')}
           >
             ✨ AI / Voice Quick Add
+          </button>
+          <button
+            type="button"
+            className={modalTab === 'sms' ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+            onClick={() => setModalTab('sms')}
+          >
+            📨 Paste Bank SMS
           </button>
           <button
             type="button"
@@ -286,7 +295,7 @@ const DashboardPage = () => {
           </button>
         </div>
 
-        {modalTab === 'nl' ? (
+        {modalTab === 'nl' && (
           <NaturalLanguageQuickAdd
             compact
             onTransactionCreated={(newTx) => {
@@ -294,7 +303,19 @@ const DashboardPage = () => {
               setModalOpen(false);
             }}
           />
-        ) : (
+        )}
+
+        {modalTab === 'sms' && (
+          <BankAlertBox
+            compact
+            onTransactionCreated={(newTx) => {
+              handleTransactionCreated(newTx);
+              setModalOpen(false);
+            }}
+          />
+        )}
+
+        {modalTab === 'manual' && (
           <TransactionForm onSubmit={handleAddTransaction} submitting={saving} />
         )}
       </Modal>
