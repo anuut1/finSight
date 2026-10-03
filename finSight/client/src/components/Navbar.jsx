@@ -1,4 +1,5 @@
 import useAuth from '../hooks/useAuth';
+import ThemeToggle from './ThemeToggle.jsx';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -43,6 +44,7 @@ const Navbar = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <ThemeToggle />
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-primary)' }}>
               {user?.name || 'Guest'}

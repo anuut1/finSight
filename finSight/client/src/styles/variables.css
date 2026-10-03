@@ -1,66 +1,174 @@
+/* ==================== FONT IMPORT ==================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap');
+
+/* ==================== CALM LEDGER DESIGN TOKENS ==================== */
+/* Dark is the primary, default fintech theme */
+:root,
+[data-theme="dark"] {
+  /* Canvas / Backgrounds */
+  --bg-primary: #0B1020;        /* Ink canvas background (~#0B1020) */
+  --bg-surface: #131A2E;        /* One step lighter solid surface for cards */
+  --bg-surface-elevated: #1B243B; /* Subtle hover / modal surface */
+  --bg-secondary: #131A2E;      /* Backwards compatible alias */
+  --bg-tertiary: #1B243B;       /* Backwards compatible alias */
+  --bg-hover: rgba(99, 102, 241, 0.08);
+
+  /* One Accent: Indigo / Violet */
+  --accent-primary: #6366F1;
+  --accent-primary-light: #818CF8;
+  --accent-primary-dark: #4F46E5;
+  --accent-focus-ring: rgba(99, 102, 241, 0.35);
+
+  /* Semantic Financial Colors (Never rely on color alone: paired with +/- & icons) */
+  --color-positive: #10B981;     /* Emerald for money in / positive */
+  --color-positive-bg: rgba(16, 185, 129, 0.12);
+  --color-positive-border: rgba(16, 185, 129, 0.3);
+
+  --color-negative: #F43F5E;     /* Coral for money out / negative */
+  --color-negative-bg: rgba(244, 63, 94, 0.12);
+  --color-negative-border: rgba(244, 63, 94, 0.3);
+
+  --color-warning: #F59E0B;      /* Amber for budget / pacing warnings */
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+  --color-warning-border: rgba(245, 158, 11, 0.3);
+
+  --color-income: var(--color-positive);
+  --color-expense: var(--color-negative);
+
+  /* Text Colors (High Contrast WCAG AA) */
+  --text-primary: #F8FAFC;       /* Off-white high contrast */
+  --text-secondary: #94A3B8;     /* Slate muted text */
+  --text-muted: #64748B;         /* Secondary detail text */
+  --text-disabled: #475569;
+
+  /* Thin 1px Subtle Borders (No heavy borders or muddy glass) */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --divider-color: rgba(255, 255, 255, 0.05);
+
+  /* Hero Card Subtle Light Blur (only 1 hero card uses this) */
+  --hero-glass-bg: rgba(19, 26, 46, 0.85);
+  --hero-glass-border: rgba(99, 102, 241, 0.3);
+  --hero-glass-blur: blur(12px);
+
+  /* Shadows (Subtle, clean elevation) */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.5);
+
+  /* Component specifics */
+  --track-bg: rgba(255, 255, 255, 0.07);
+  --ring-teal: #14B8A6;
+  --ring-amber: #F59E0B;
+}
+
+/* Light Theme (Clean, trustworthy, precise fintech light mode) */
+[data-theme="light"] {
+  /* Canvas / Backgrounds */
+  --bg-primary: #F8FAFC;        /* Soft crisp off-white canvas */
+  --bg-surface: #FFFFFF;        /* Pristine solid card surface */
+  --bg-surface-elevated: #F1F5F9;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F1F5F9;
+  --bg-hover: rgba(99, 102, 241, 0.05);
+
+  /* Accent: Indigo / Violet */
+  --accent-primary: #4F46E5;
+  --accent-primary-light: #6366F1;
+  --accent-primary-dark: #3730A3;
+  --accent-focus-ring: rgba(79, 70, 229, 0.25);
+
+  /* Semantic Financial Colors (WCAG AA verified contrast) */
+  --color-positive: #059669;     /* Deep Emerald */
+  --color-positive-bg: rgba(5, 150, 105, 0.08);
+  --color-positive-border: rgba(5, 150, 105, 0.25);
+
+  --color-negative: #E11D48;     /* Rich Coral Red */
+  --color-negative-bg: rgba(225, 29, 72, 0.08);
+  --color-negative-border: rgba(225, 29, 72, 0.25);
+
+  --color-warning: #D97706;      /* Amber */
+  --color-warning-bg: rgba(217, 119, 6, 0.08);
+  --color-warning-border: rgba(217, 119, 6, 0.25);
+
+  --color-income: var(--color-positive);
+  --color-expense: var(--color-negative);
+
+  /* Text Colors */
+  --text-primary: #0F172A;       /* Slate 900 for high readability */
+  --text-secondary: #475569;     /* Slate 600 */
+  --text-muted: #64748B;         /* Slate 500 */
+  --text-disabled: #94A3B8;
+
+  /* Thin 1px Subtle Borders */
+  --border-color: #E2E8F0;       /* Slate 200 */
+  --border-strong: #CBD5E1;
+  --divider-color: #F1F5F9;
+
+  /* Hero Card */
+  --hero-glass-bg: rgba(255, 255, 255, 0.95);
+  --hero-glass-border: rgba(79, 70, 229, 0.2);
+  --hero-glass-blur: blur(8px);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.1);
+
+  /* Component specifics */
+  --track-bg: #E2E8F0;
+  --ring-teal: #0D9488;
+  --ring-amber: #D97706;
+}
+
+/* Common Design Rules */
 :root {
-  /* ==================== BACKGROUND COLORS ==================== */
-  --bg-primary: #0f1419;
-  --bg-secondary: #1a1f2e;
-  --bg-tertiary: #25293d;
-  --bg-hover: #2d3245;
-  
-  /* ==================== ACCENT COLORS ==================== */
-  --accent-primary: #6366f1;    /* Indigo */
-  --accent-primary-light: #818cf8;
-  --accent-primary-dark: #4f46e5;
-  --accent-secondary: #ec4899;   /* Pink */
-  --accent-success: #10b981;     /* Emerald */
-  --accent-warning: #f59e0b;     /* Amber */
-  --accent-danger: #ef4444;      /* Red */
-  
-  /* ==================== SEMANTIC COLORS ==================== */
-  --color-income: #10b981;
-  --color-expense: #ef4444;
-  --color-neutral: #8b5cf6;
-  
-  /* ==================== TEXT COLORS ==================== */
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --text-disabled: #64748b;
-  
-  /* ==================== BORDER & DIVIDER ==================== */
-  --border-color: rgba(148, 163, 184, 0.12);
-  --divider-color: rgba(148, 163, 184, 0.08);
-  
-  /* ==================== GLASS MORPHISM ==================== */
-  --glass-bg: rgba(30, 41, 59, 0.8);
-  --glass-border: rgba(148, 163, 184, 0.12);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  
-  /* ==================== SHADOWS ==================== */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px 0 rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  
-  /* ==================== BORDER RADIUS ==================== */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* Radius 12-16px */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
   --radius-xl: 16px;
   --radius-2xl: 20px;
   --radius-full: 9999px;
-  
-  /* ==================== SPACING ==================== */
+
+  /* Spacings */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
   --spacing-2xl: 3rem;
-  
-  /* ==================== TRANSITIONS ==================== */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Motion durations (150-250ms, ease-out) */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 250ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Transitions */
+  --transition-fast: var(--duration-fast) var(--ease-out);
+  --transition-base: var(--duration-base) var(--ease-out);
+  --transition-slow: var(--duration-slow) var(--ease-out);
+}
+
+/* Number-first rule: All currency values MUST use tabular numbers */
+.num-tabular,
+[data-tabular="true"],
+.currency-val,
+.stat-card-value,
+.stat-val {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Accessibility: Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

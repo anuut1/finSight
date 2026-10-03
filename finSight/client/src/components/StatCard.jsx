@@ -1,42 +1,84 @@
-import GlassCard from './GlassCard.jsx';
+import Card from './Card.jsx';
 
 const StatCard = ({ label, value, subtitle, tone = 'neutral' }) => {
-  const colorMap = {
-    positive: 'var(--accent-teal)',
-    negative: 'var(--accent-red)',
-    neutral: 'var(--accent-blue)',
+  const toneConfig = {
+    positive: {
+      color: 'var(--color-positive)',
+      bg: 'var(--color-positive-bg)',
+      icon: '+',
+    },
+    negative: {
+      color: 'var(--color-negative)',
+      bg: 'var(--color-negative-bg)',
+      icon: '−',
+    },
+    neutral: {
+      color: 'var(--text-primary)',
+      bg: 'transparent',
+      icon: '',
+    },
   };
 
+  const currentTone = toneConfig[tone] || toneConfig.neutral;
+
   return (
-    <GlassCard
+    <Card
       style={{
-        padding: '1rem 1.1rem',
+        padding: '1.1rem 1.25rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.35rem',
+        gap: '0.4rem',
       }}
     >
-      <span
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span
+          style={{
+            fontSize: '0.72rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: 'var(--text-muted)',
+            fontWeight: 600,
+          }}
+        >
+          {label}
+        </span>
+        {currentTone.icon && (
+          <span
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: currentTone.color,
+              background: currentTone.bg,
+              padding: '2px 6px',
+              borderRadius: 'var(--radius-sm)',
+              lineHeight: 1,
+            }}
+          >
+            {currentTone.icon}
+          </span>
+        )}
+      </div>
+
+      <div
+        className="num-tabular"
         style={{
-          fontSize: '0.75rem',
-          textTransform: 'uppercase',
-          letterSpacing: '0.12em',
-          color: 'var(--text-muted)',
+          fontSize: '1.65rem',
+          fontWeight: 700,
+          color: currentTone.color,
+          lineHeight: 1.15,
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {label}
-      </span>
-      <span style={{ fontSize: '1.4rem', fontWeight: 600, color: colorMap[tone] }}>
         {value}
-      </span>
+      </div>
+
       {subtitle && (
-        <span style={{ fontSize: '0.8rem' }} className="text-muted">
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           {subtitle}
         </span>
       )}
-    </GlassCard>
+    </Card>
   );
 };
 
 export default StatCard;
-

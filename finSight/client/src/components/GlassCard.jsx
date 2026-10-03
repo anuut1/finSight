@@ -1,10 +1,15 @@
-const GlassCard = ({ style, children }) => {
+import Card from './Card.jsx';
+
+/**
+ * Refactored GlassCard -> Calm Ledger Card
+ * Maintained for backwards compatibility across existing pages
+ */
+const GlassCard = ({ style, className = '', children, ...props }) => {
   return (
-    <div className="glass-card" style={style}>
+    <Card style={style} className={className} {...props}>
       {children}
-    </div>
+    </Card>
   );
 };
 
 export default GlassCard;
-
