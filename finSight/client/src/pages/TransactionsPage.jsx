@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import GlassCard from '../components/GlassCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
+import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
 import api from '../api/axios.js';
 
 const TransactionsPage = () => {
@@ -134,6 +135,8 @@ const TransactionsPage = () => {
           + Add transaction
         </button>
       </div>
+
+      <NaturalLanguageQuickAdd onTransactionCreated={() => fetchTransactions()} />
 
       <GlassCard style={{ padding: '0.9rem 1.1rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>

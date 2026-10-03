@@ -3,21 +3,24 @@ import GlassCard from '../components/GlassCard.jsx';
 import StatCard from '../components/StatCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
+import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import api from '../api/axios.js';
 import { useState } from 'react';
 
 const DashboardPage = () => {
-  const { data: summary, loading: loadingSummary } = useFetch('/analytics/summary', {}, []);
-  const { data: budgets } = useFetch('/budgets', {}, []);
-  const { data: goals } = useFetch('/goals', {}, []);
+  const [refreshCount, setRefreshCount] = useState(0);
+  const { data: summary, loading: loadingSummary } = useFetch('/analytics/summary', {}, [refreshCount]);
+  const { data: budgets } = useFetch('/budgets', {}, [refreshCount]);
+  const { data: goals } = useFetch('/goals', {}, [refreshCount]);
   const { data: txData, loading: loadingTx, error: errorTx, setData: setTxData } = useFetch(
     '/transactions?limit=5&page=1',
     {},
-    []
+    [refreshCount]
   );
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState('nl');
   const [saving, setSaving] = useState(false);
   const recentTransactions = txData?.items ?? [];
 
@@ -36,6 +39,16 @@ const DashboardPage = () => {
       // error surface not critical in quick add
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTransactionCreated = (newTx) => {
+    setRefreshCount((c) => c + 1);
+    if (newTx) {
+      setTxData((prev) => ({
+        ...(prev || {}),
+        items: [newTx, ...(prev?.items || [])].slice(0, 5),
+      }));
     }
   };
 
@@ -84,6 +97,9 @@ const DashboardPage = () => {
           + Quick add transaction
         </button>
       </div>
+
+      {/* Natural Language Quick Add Widget */}
+      <NaturalLanguageQuickAdd onTransactionCreated={handleTransactionCreated} />
 
       {/* Top Card Row - Shows ONLY Money Left */}
       <div style={{ marginBottom: '1.25rem', maxWidth: '340px' }}>
@@ -356,11 +372,40 @@ const DashboardPage = () => {
       </div>
 
       <Modal
-        title="Quick add transaction"
+        title="Add Transaction"
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
       >
-        <TransactionForm onSubmit={handleAddTransaction} submitting={saving} />
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className={modalTab === 'nl' ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+            onClick={() => setModalTab('nl')}
+          >
+            ✨ AI / Voice Quick Add
+          </button>
+          <button
+            type="button"
+            className={modalTab === 'manual' ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+            onClick={() => setModalTab('manual')}
+          >
+            ✏️ Manual Form
+          </button>
+        </div>
+
+        {modalTab === 'nl' ? (
+          <NaturalLanguageQuickAdd
+            compact
+            onTransactionCreated={(newTx) => {
+              handleTransactionCreated(newTx);
+              setModalOpen(false);
+            }}
+          />
+        ) : (
+          <TransactionForm onSubmit={handleAddTransaction} submitting={saving} />
+        )}
       </Modal>
     </>
   );

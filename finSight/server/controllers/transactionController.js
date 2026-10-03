@@ -1,4 +1,5 @@
 const Transaction = require('../models/Transaction');
+const { parseNaturalLanguageInput } = require('../services/quickAddParser');
 
 exports.getTransactions = async (req, res) => {
   try {
@@ -102,6 +103,26 @@ exports.deleteTransaction = async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.parseQuickAdd = async (req, res) => {
+  try {
+    const { text, timeZone, currentDate } = req.body;
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'Input text is required' });
+    }
+
+    const parsed = await parseNaturalLanguageInput(text, {
+      timeZone,
+      currentDate,
+      user: req.user,
+    });
+
+    return res.json({ success: true, data: parsed });
+  } catch (err) {
+    console.error('Quick add parsing error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to parse natural language input' });
   }
 };
 

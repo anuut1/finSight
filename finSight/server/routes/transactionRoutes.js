@@ -4,10 +4,12 @@ const {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  parseQuickAdd,
 } = require('../controllers/transactionController');
 
 const router = express.Router();
 
+router.post('/quick-add/parse', parseQuickAdd);
 router.get('/', getTransactions);
 router.post('/', createTransaction);
 router.put('/:id', updateTransaction);
