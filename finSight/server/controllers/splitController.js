@@ -317,3 +317,175 @@ exports.deleteGroup = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+const getTripSummaryData = (group) => {
+  const serialized = serializeGroup(group);
+  const totalSpend = roundMoney(
+    group.expenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0)
+  );
+  const totalMembers = group.members.length || 1;
+  const perPersonFairShare = roundMoney(totalSpend / totalMembers);
+
+  const memberContributions = group.members.map((m) => {
+    const mId = m._id.toString();
+    const paid = roundMoney(
+      group.expenses
+        .filter((e) => e.paidBy.toString() === mId)
+        .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+    );
+    const balanceInfo = serialized.memberBalances.find((mb) => mb.memberId === mId);
+    return {
+      memberId: mId,
+      name: m.name,
+      email: m.email,
+      totalPaid: paid,
+      netBalance: balanceInfo ? balanceInfo.balance : 0,
+    };
+  });
+
+  return {
+    ...serialized,
+    tripSummary: {
+      totalSpend,
+      expensesCount: group.expenses.length,
+      currency: group.currency || 'INR',
+      perPersonFairShare,
+      memberContributions,
+      simplifiedDebts: serialized.simplifiedDebts,
+      status: group.tripStatus || 'ended',
+      startDate: group.startDate,
+      endDate: group.endDate,
+    },
+  };
+};
+
+exports.getActiveTrip = async (req, res) => {
+  try {
+    const activeTrip = await SplitGroup.findOne({
+      userId: req.user.id,
+      isTrip: true,
+      tripStatus: 'active',
+    });
+
+    if (!activeTrip) {
+      return res.json({ success: true, data: null });
+    }
+
+    return res.json({ success: true, data: getTripSummaryData(activeTrip) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.startTrip = async (req, res) => {
+  try {
+    const { name, members = [], currency = 'INR' } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Trip name is required' });
+    }
+
+    const cleanMembers = members
+      .map((member) => ({
+        name: String(member.name || '').trim(),
+        email: String(member.email || '').trim(),
+      }))
+      .filter((member) => member.name);
+
+    const userEmail = user?.email?.toLowerCase();
+    const matchingUserIndex = cleanMembers.findIndex(
+      (member) =>
+        (userEmail && member.email.toLowerCase() === userEmail) ||
+        member.name.toLowerCase() === 'you'
+    );
+
+    if (matchingUserIndex >= 0) {
+      cleanMembers[matchingUserIndex] = {
+        name: user?.name || cleanMembers[matchingUserIndex].name,
+        email: user?.email || cleanMembers[matchingUserIndex].email,
+      };
+    } else if (user) {
+      cleanMembers.unshift({ name: user.name, email: user.email });
+    }
+
+    if (cleanMembers.length < 2) {
+      return res.status(400).json({ success: false, message: 'Add at least two members for the trip' });
+    }
+
+    // End any previously active trips to prevent state conflicts
+    await SplitGroup.updateMany(
+      { userId: req.user.id, isTrip: true, tripStatus: 'active' },
+      { $set: { tripStatus: 'ended', endDate: new Date() } }
+    );
+
+    const tripGroup = new SplitGroup({
+      userId: req.user.id,
+      name: name.trim(),
+      members: cleanMembers,
+      expenses: [],
+      settlements: [],
+      isTrip: true,
+      tripStatus: 'active',
+      currency: (currency || 'INR').toUpperCase(),
+      startDate: new Date(),
+    });
+
+    const ownerMember =
+      tripGroup.members.find((member) => userEmail && member.email === userEmail) || tripGroup.members[0];
+    tripGroup.ownerMemberId = ownerMember._id;
+
+    await tripGroup.save();
+
+    return res.status(201).json({ success: true, data: getTripSummaryData(tripGroup) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.endTrip = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const tripGroup = await SplitGroup.findOne({
+      _id: groupId,
+      userId: req.user.id,
+      isTrip: true,
+    });
+
+    if (!tripGroup) {
+      return res.status(404).json({ success: false, message: 'Trip group not found' });
+    }
+
+    tripGroup.tripStatus = 'ended';
+    tripGroup.endDate = new Date();
+    await tripGroup.save();
+
+    return res.json({ success: true, data: getTripSummaryData(tripGroup) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getTripSummary = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const tripGroup = await SplitGroup.findOne({
+      _id: groupId,
+      userId: req.user.id,
+      isTrip: true,
+    });
+
+    if (!tripGroup) {
+      return res.status(404).json({ success: false, message: 'Trip group not found' });
+    }
+
+    return res.json({ success: true, data: getTripSummaryData(tripGroup) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+

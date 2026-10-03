@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import GlassCard from '../components/GlassCard.jsx';
 import Modal from '../components/Modal.jsx';
+import TripModeWidget from '../components/TripModeWidget.jsx';
 import api from '../api/axios.js';
 import useAuth from '../hooks/useAuth.js';
 
@@ -230,6 +231,9 @@ const SplitsPage = () => {
           + New group
         </button>
       </div>
+
+      {/* Trip Mode Banner & Settlement Tool */}
+      <TripModeWidget onTripChanged={() => fetchGroups()} />
 
       {error && (
         <div

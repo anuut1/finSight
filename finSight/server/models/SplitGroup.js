@@ -42,6 +42,11 @@ const splitGroupSchema = new mongoose.Schema(
     members: [splitMemberSchema],
     expenses: [splitExpenseSchema],
     settlements: [splitSettlementSchema],
+    isTrip: { type: Boolean, default: false },
+    tripStatus: { type: String, enum: ['active', 'ended'], default: 'active' },
+    currency: { type: String, default: 'INR' },
+    startDate: { type: Date },
+    endDate: { type: Date },
   },
   { timestamps: true }
 );

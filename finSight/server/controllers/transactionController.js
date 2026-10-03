@@ -1,4 +1,5 @@
 const Transaction = require('../models/Transaction');
+const SplitGroup = require('../models/SplitGroup');
 const { parseNaturalLanguageInput } = require('../services/quickAddParser');
 
 exports.getTransactions = async (req, res) => {
@@ -41,10 +42,42 @@ exports.getTransactions = async (req, res) => {
 
 exports.createTransaction = async (req, res) => {
   try {
-    const { type, category, amount, description, date, tags = [], mood = 'neutral' } = req.body;
+    const {
+      type,
+      category,
+      amount,
+      description,
+      date,
+      tags = [],
+      mood = 'neutral',
+      autoTagTrip = true,
+      splitGroupId,
+    } = req.body;
 
     if (!type || !category || !amount || !date) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    let finalTags = Array.isArray(tags) ? [...tags] : [];
+    let finalSplitGroupId = splitGroupId;
+    let source = 'manual';
+    let currency = 'INR';
+    let activeTrip = null;
+
+    if (autoTagTrip !== false && !finalSplitGroupId) {
+      activeTrip = await SplitGroup.findOne({
+        userId: req.user.id,
+        isTrip: true,
+        tripStatus: 'active',
+      });
+
+      if (activeTrip) {
+        finalSplitGroupId = activeTrip._id;
+        source = 'trip';
+        currency = activeTrip.currency || 'INR';
+        if (!finalTags.includes('trip')) finalTags.push('trip');
+        if (!finalTags.includes(activeTrip.name)) finalTags.push(activeTrip.name);
+      }
     }
 
     const transaction = await Transaction.create({
@@ -54,9 +87,43 @@ exports.createTransaction = async (req, res) => {
       amount,
       description,
       date,
-      tags,
+      tags: finalTags,
       mood,
+      source,
+      currency,
+      splitGroupId: finalSplitGroupId,
     });
+
+    // If an active trip exists and this is an expense, automatically sync as a trip expense split among preset members
+    if (activeTrip && type === 'expense' && activeTrip.members?.length) {
+      try {
+        const memberIds = activeTrip.members.map((m) => m._id);
+        const ownerId = activeTrip.ownerMemberId || memberIds[0];
+        const numericAmount = Number(amount);
+        const personalShare =
+          Math.round(((numericAmount / memberIds.length) + Number.EPSILON) * 100) / 100;
+
+        const tripExpense = activeTrip.expenses.create({
+          description: description || `${category} expense`,
+          amount: numericAmount,
+          paidBy: ownerId,
+          splitBetween: memberIds,
+          date,
+          category,
+          syncPersonal: false, // Already created personal transaction above
+          personalShareAmount: personalShare,
+          personalTransactionId: transaction._id,
+        });
+
+        activeTrip.expenses.push(tripExpense);
+        await activeTrip.save();
+
+        transaction.splitExpenseId = tripExpense._id;
+        await transaction.save();
+      } catch (tripSyncErr) {
+        console.warn('Could not auto-add expense to active trip:', tripSyncErr.message);
+      }
+    }
 
     return res.status(201).json({ success: true, data: transaction });
   } catch (err) {

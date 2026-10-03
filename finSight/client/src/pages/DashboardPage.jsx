@@ -4,6 +4,7 @@ import StatCard from '../components/StatCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
+import TripModeWidget from '../components/TripModeWidget.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import api from '../api/axios.js';
 import { useState } from 'react';
@@ -97,6 +98,9 @@ const DashboardPage = () => {
           + Quick add transaction
         </button>
       </div>
+
+      {/* Trip Mode Banner & Controls */}
+      <TripModeWidget onTripChanged={() => setRefreshCount((c) => c + 1)} />
 
       {/* Natural Language Quick Add Widget */}
       <NaturalLanguageQuickAdd onTransactionCreated={handleTransactionCreated} />

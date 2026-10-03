@@ -5,9 +5,18 @@ const {
   addExpense,
   addSettlement,
   deleteGroup,
+  getActiveTrip,
+  startTrip,
+  endTrip,
+  getTripSummary,
 } = require('../controllers/splitController');
 
 const router = express.Router();
+
+router.get('/trips/active', getActiveTrip);
+router.post('/trips/start', startTrip);
+router.post('/trips/:groupId/end', endTrip);
+router.get('/trips/:groupId/summary', getTripSummary);
 
 router.get('/groups', getGroups);
 router.post('/groups', createGroup);

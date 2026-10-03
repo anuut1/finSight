@@ -40,6 +40,7 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
   // Optional split groups from existing API
   const [splitGroups, setSplitGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [activeTrip, setActiveTrip] = useState(null);
 
   useEffect(() => {
     // Check Web Speech API support
@@ -83,16 +84,23 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
       recognitionRef.current = recognition;
     }
 
-    // Preload user's split groups if available
+    // Preload user's split groups and check for an active trip
     api.get('/splits/groups')
       .then((res) => {
         if (res.data?.success && Array.isArray(res.data.data)) {
           setSplitGroups(res.data.data);
         }
       })
-      .catch(() => {
-        // Silently ignore if splits module is empty or not yet loaded
-      });
+      .catch(() => {});
+
+    api.get('/splits/trips/active')
+      .then((res) => {
+        if (res.data?.success && res.data.data) {
+          setActiveTrip(res.data.data);
+          setSelectedGroupId(res.data.data._id);
+        }
+      })
+      .catch(() => {});
 
     return () => {
       if (recognitionRef.current) {
@@ -146,6 +154,14 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
 
       if (res.data?.success && res.data.data) {
         const data = res.data.data;
+        const isTripActive = Boolean(activeTrip && data.type !== 'income');
+        const tripMemberNames = isTripActive
+          ? activeTrip.members
+              ?.map((m) => m.name)
+              .filter((n) => !['you', 'me', 'myself', 'i', 'self'].includes(n.toLowerCase()))
+              .join(', ')
+          : '';
+
         // Populate the editable confirmation card draft
         setDraft({
           type: data.type || 'expense',
@@ -154,11 +170,17 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
           date: data.date || new Date().toISOString().slice(0, 10),
           description: data.note || textToParse,
           mood: data.mood || 'neutral',
-          isSplit: Boolean(data.isSplit),
-          splitMembers: Array.isArray(data.splitMembers) ? data.splitMembers.join(', ') : '',
+          isSplit: isTripActive || Boolean(data.isSplit),
+          splitMembers: isTripActive
+            ? tripMemberNames || (Array.isArray(data.splitMembers) ? data.splitMembers.join(', ') : '')
+            : Array.isArray(data.splitMembers) ? data.splitMembers.join(', ') : '',
           splitType: data.splitType || 'equal',
-          syncToGroup: false,
+          syncToGroup: isTripActive,
         });
+
+        if (isTripActive && activeTrip._id) {
+          setSelectedGroupId(activeTrip._id);
+        }
       } else {
         setParseError('Failed to parse details. Please try rephrasing.');
       }
@@ -291,6 +313,20 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false }) => {
           >
             AI Assisted
           </span>
+          {activeTrip && (
+            <span
+              style={{
+                fontSize: '0.7rem',
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-full)',
+                background: 'rgba(16, 185, 129, 0.2)',
+                color: 'var(--accent-success)',
+                fontWeight: 700,
+              }}
+            >
+              ✈️ Trip: {activeTrip.name} ({activeTrip.currency})
+            </span>
+          )}
         </div>
         <span className="text-muted" style={{ fontSize: '0.75rem' }}>
           Never saved without your confirmation
