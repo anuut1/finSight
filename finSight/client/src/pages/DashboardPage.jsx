@@ -43,6 +43,11 @@ const DashboardPage = () => {
   const [modalTab, setModalTab] = useState('manual');
   const [saving, setSaving] = useState(false);
 
+  // Edit transaction state
+  const [editingTx, setEditingTx] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [recentlyAddedTx, setRecentlyAddedTx] = useState(null);
+
   const drafts = draftsData || [];
 
   // Calculate total budget limits
@@ -50,8 +55,11 @@ const DashboardPage = () => {
     ? budgets.reduce((sum, b) => sum + (Number(b.limit) || 0), 0)
     : 0;
 
-  const handleTransactionCreated = () => {
+  const handleTransactionCreated = (newTx) => {
     setRefreshCount((c) => c + 1);
+    if (newTx && newTx._id) {
+      setRecentlyAddedTx(newTx);
+    }
   };
 
   const handleManualAddSubmit = async (payload) => {
@@ -59,12 +67,42 @@ const DashboardPage = () => {
     try {
       const res = await api.post('/transactions', payload);
       if (res.data?.success) {
-        handleTransactionCreated();
+        handleTransactionCreated(res.data.data);
         setModalOpen(false);
         return res.data;
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEditSubmit = async (payload) => {
+    if (!editingTx) return;
+    setSaving(true);
+    try {
+      const res = await api.put(`/transactions/${editingTx._id}`, payload);
+      if (res.data?.success) {
+        setRefreshCount((c) => c + 1);
+        setRecentlyAddedTx(res.data.data);
+        setEditModalOpen(false);
+        setEditingTx(null);
+        return res.data;
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteRecentTx = async () => {
+    if (!recentlyAddedTx) return;
+    if (window.confirm('Delete this transaction?')) {
+      try {
+        await api.delete(`/transactions/${recentlyAddedTx._id}`);
+        setRecentlyAddedTx(null);
+        setRefreshCount((c) => c + 1);
+      } catch (err) {
+        alert(err?.response?.data?.message || 'Failed to delete transaction');
+      }
     }
   };
 
@@ -197,8 +235,8 @@ const DashboardPage = () => {
           <VoiceExpenseRecorder
             initialText={quickAddPrefill}
             onCancel={() => setModalOpen(false)}
-            onTransactionCreated={() => {
-              handleTransactionCreated();
+            onTransactionCreated={(newTx) => {
+              handleTransactionCreated(newTx);
               setModalOpen(false);
             }}
           />
@@ -207,9 +245,114 @@ const DashboardPage = () => {
         {modalTab === 'receipt' && (
           <ReceiptScannerBox
             compact
-            onTransactionCreated={() => {
-              handleTransactionCreated();
+            onTransactionCreated={(newTx) => {
+              handleTransactionCreated(newTx);
               setModalOpen(false);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Post-Add Action Toast: Give instant option to Edit or Delete a wrong transaction */}
+      {recentlyAddedTx && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: '5.5rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            background: 'var(--color-ink, #14151A)',
+            color: '#FFFFFF',
+            padding: '10px 18px',
+            borderRadius: '999px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '0.88rem',
+            maxWidth: 'min(580px, 94vw)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+          }}
+        >
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            ✓ Added ₹{Number(recentlyAddedTx.amount || 0).toLocaleString('en-IN')}{' '}
+            <span style={{ opacity: 0.75 }}>
+              ({recentlyAddedTx.description || recentlyAddedTx.category})
+            </span>
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingTx(recentlyAddedTx);
+                setEditModalOpen(true);
+              }}
+              style={{
+                background: '#FFFFFF',
+                color: 'var(--color-ink, #14151A)',
+                border: 'none',
+                padding: '5px 14px',
+                borderRadius: '999px',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteRecentTx}
+              style={{
+                background: 'transparent',
+                color: '#FCA5A5',
+                border: '1px solid rgba(252, 165, 165, 0.4)',
+                padding: '4px 10px',
+                borderRadius: '999px',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Undo / Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecentlyAddedTx(null)}
+              aria-label="Dismiss banner"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9CA3AF',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                padding: '0 4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Transaction Modal */}
+      <Modal
+        title="Edit Transaction"
+        isOpen={editModalOpen}
+        onClose={() => !saving && setEditModalOpen(false)}
+      >
+        {editingTx && (
+          <TransactionForm
+            initialValues={editingTx}
+            onSubmit={handleEditSubmit}
+            submitting={saving}
+            onCancel={() => {
+              setEditModalOpen(false);
+              setEditingTx(null);
             }}
           />
         )}

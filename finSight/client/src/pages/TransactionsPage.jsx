@@ -24,6 +24,16 @@ const TransactionsPage = () => {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [recentlyAddedTx, setRecentlyAddedTx] = useState(null);
+
+  useEffect(() => {
+    if (recentlyAddedTx) {
+      const timer = setTimeout(() => {
+        setRecentlyAddedTx(null);
+      }, 12000);
+      return () => clearTimeout(timer);
+    }
+  }, [recentlyAddedTx]);
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -85,6 +95,7 @@ const TransactionsPage = () => {
             ...prev,
             items: prev.items.map((t) => (t._id === editing._id ? res.data.data : t)),
           }));
+          setRecentlyAddedTx(res.data.data);
           setModalOpen(false);
           return res.data;
         }
@@ -95,6 +106,7 @@ const TransactionsPage = () => {
             ...prev,
             items: [res.data.data, ...prev.items].slice(0, limit),
           }));
+          setRecentlyAddedTx(res.data.data);
           setModalOpen(false);
           return res.data;
         }
@@ -334,20 +346,20 @@ const TransactionsPage = () => {
                         {t.mood ? t.mood.charAt(0).toUpperCase() + t.mood.slice(1) : 'Neutral'}
                       </span>
                     </td>
-                    <td style={{ padding: '0.65rem 0', textAlign: 'right' }}>
+                    <td style={{ padding: '0.65rem 0', textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         onClick={() => openEditModal(t)}
                         style={{
                           border: '1px solid var(--border-color)',
-                          background: 'transparent',
-                          color: 'var(--color-accent)',
+                          background: 'var(--bg-surface)',
+                          color: 'var(--text-primary)',
                           cursor: 'pointer',
-                          marginRight: '0.5rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          padding: '4px 8px',
-                          borderRadius: 'var(--radius-sm, 8px)',
+                          marginRight: '0.4rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 500,
+                          padding: '4px 12px',
+                          borderRadius: '999px',
                         }}
                       >
                         Edit
@@ -356,14 +368,14 @@ const TransactionsPage = () => {
                         type="button"
                         onClick={() => handleDelete(t._id)}
                         style={{
-                          border: '1px solid rgba(244, 63, 94, 0.25)',
+                          border: '1px solid rgba(180, 83, 9, 0.3)',
                           background: 'transparent',
-                          color: 'var(--color-negative)',
+                          color: 'var(--color-warning)',
                           cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          padding: '4px 8px',
-                          borderRadius: 'var(--radius-sm, 8px)',
+                          fontSize: '0.78rem',
+                          fontWeight: 500,
+                          padding: '4px 12px',
+                          borderRadius: '999px',
                         }}
                       >
                         Delete
@@ -460,8 +472,11 @@ const TransactionsPage = () => {
         {!editing && modalTab === 'voice' && (
           <VoiceExpenseRecorder
             onCancel={() => setModalOpen(false)}
-            onTransactionCreated={() => {
+            onTransactionCreated={(newTx) => {
               fetchTransactions();
+              if (newTx && newTx._id) {
+                setRecentlyAddedTx(newTx);
+              }
               setModalOpen(false);
             }}
           />
@@ -471,8 +486,99 @@ const TransactionsPage = () => {
       <ReceiptScannerModal
         isOpen={receiptModalOpen}
         onClose={() => setReceiptModalOpen(false)}
-        onTransactionCreated={() => fetchTransactions()}
+        onTransactionCreated={(newTx) => {
+          fetchTransactions();
+          if (newTx && newTx._id) {
+            setRecentlyAddedTx(newTx);
+          }
+        }}
       />
+
+      {/* Post-Add Action Toast: Give instant option to Edit or Delete a wrong transaction */}
+      {recentlyAddedTx && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            background: 'var(--color-ink, #14151A)',
+            color: '#FFFFFF',
+            padding: '10px 18px',
+            borderRadius: '999px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '0.88rem',
+            maxWidth: 'min(580px, 94vw)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+          }}
+        >
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            ✓ Added ₹{Number(recentlyAddedTx.amount || 0).toLocaleString('en-IN')}{' '}
+            <span style={{ opacity: 0.75 }}>
+              ({recentlyAddedTx.description || recentlyAddedTx.category})
+            </span>
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => openEditModal(recentlyAddedTx)}
+              style={{
+                background: '#FFFFFF',
+                color: 'var(--color-ink, #14151A)',
+                border: 'none',
+                padding: '5px 14px',
+                borderRadius: '999px',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await handleDelete(recentlyAddedTx._id);
+                setRecentlyAddedTx(null);
+              }}
+              style={{
+                background: 'transparent',
+                color: '#FCA5A5',
+                border: '1px solid rgba(252, 165, 165, 0.4)',
+                padding: '4px 10px',
+                borderRadius: '999px',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Undo / Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecentlyAddedTx(null)}
+              aria-label="Dismiss banner"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9CA3AF',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                padding: '0 4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 };
