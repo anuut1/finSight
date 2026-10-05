@@ -35,6 +35,8 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
   const [draft, setDraft] = useState(null);
 
   const recognitionRef = useRef(null);
+  // Text typed in the Quick Add bar: skip the mic UI and go straight to the review card.
+  const typedMode = Boolean(initialText);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -153,6 +155,11 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
     }
   };
 
+  useEffect(() => {
+    if (typedMode) handleParseText(initialText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSaveExpense = async (e) => {
     e.preventDefault();
     if (!draft) return;
@@ -193,9 +200,11 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Intro info */}
+      {!typedMode && (
       <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
         Tap the microphone and speak naturally, e.g. <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>&ldquo;Coffee 180 rupees at Starbucks&rdquo;</span> or <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>&ldquo;Groceries 1200 yesterday&rdquo;</span>.
       </p>
+      )}
 
       {/* Voice Recorder Hub */}
       <div
@@ -211,6 +220,7 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
           textAlign: 'center',
         }}
       >
+        {!typedMode && (<>
         {/* Pulsing Mic Circle Button */}
         <button
           type="button"
@@ -246,6 +256,8 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
             {isRecording ? 'Tap stop when finished speaking' : speechSupported ? 'Microphone is ready' : 'Or type your note below'}
           </div>
         </div>
+
+        </>)}
 
         {/* Live / Typed Transcript Box */}
         <div style={{ width: '100%' }}>
@@ -295,7 +307,7 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
                 disabled={parsing || !transcript.trim()}
                 loading={parsing}
               >
-                Analyze Voice Note &rarr;
+                {typedMode ? 'Analyze \u2192' : 'Analyze Voice Note \u2192'}
               </Button>
             )}
           </div>

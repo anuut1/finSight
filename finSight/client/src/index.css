@@ -676,3 +676,18 @@ tbody tr:hover {
     font-size: 16px; /* Prevent zoom on mobile */
   }
 }
+
+/* ==================== BUTTON SIZE SYSTEM (single source of truth) ==================== */
+.btn { min-height: 44px; padding: 0 22px; }
+.btn-sm { min-height: 36px; padding: 0 16px; font-size: 0.82rem; }
+.btn-lg { min-height: 52px; padding: 0 26px; font-size: 0.95rem; }
+.btn-danger { min-height: 44px; }
+.btn-icon-round {
+  width: 36px; height: 36px; padding: 0; flex: 0 0 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid var(--border-color);
+  background: transparent; color: var(--text-primary); cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.btn-icon-round:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.btn-icon-round:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }

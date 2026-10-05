@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import Modal from './Modal';
+import Button from './Button';
+import TripAddExpenseModal from './TripAddExpenseModal';
 
 const CURRENCIES = [
   { code: 'INR', symbol: '₹', label: 'INR (₹)' },
@@ -34,6 +36,7 @@ const TripModeWidget = ({ onTripChanged }) => {
 
   // Settlement inline state
   const [settlingDebt, setSettlingDebt] = useState(null);
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
 
   const fetchActiveTrip = async () => {
     try {
@@ -279,40 +282,9 @@ Calculated via FinSight`;
 
           {/* Action buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setEndedSummary(activeTrip);
-                setEndModalOpen(true);
-              }}
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                padding: '6px 14px',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              📊 View Debts
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleEndTrip}
-              disabled={submitting}
-              style={{
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                borderColor: '#ef4444',
-                padding: '6px 16px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-              }}
-            >
-              {submitting ? 'Ending...' : '🏁 End Trip & Settle'}
-            </button>
+            <Button size="sm" onClick={() => setAddExpenseOpen(true)}>+ Add expense</Button>
+            <Button size="sm" variant="secondary" onClick={() => { setEndedSummary(activeTrip); setEndModalOpen(true); }}>Settle up</Button>
+            <Button size="sm" variant="danger" onClick={handleEndTrip} loading={submitting}>End trip</Button>
           </div>
         </div>
       ) : (
@@ -344,20 +316,7 @@ Calculated via FinSight`;
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setStartModalOpen(true)}
-            style={{
-              padding: '5px 14px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              borderColor: 'var(--accent-primary-light)',
-              color: 'var(--accent-primary-light)',
-            }}
-          >
-            + Start Trip Mode
-          </button>
+          <Button size="sm" onClick={() => setStartModalOpen(true)}>+ Start trip mode</Button>
         </div>
       )}
 
@@ -452,17 +411,8 @@ Calculated via FinSight`;
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setStartModalOpen(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary" disabled={submitting}>
-              {submitting ? 'Starting...' : '🚀 Start Trip Mode'}
-            </button>
+            <Button variant="secondary" onClick={() => setStartModalOpen(false)}>Cancel</Button>
+            <Button type="submit" loading={submitting}>Start trip mode</Button>
           </div>
         </form>
       </Modal>
@@ -589,23 +539,7 @@ Calculated via FinSight`;
                           {debt.amount.toLocaleString()}
                         </span>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRecordSettlement(debt)}
-                          disabled={isSettling}
-                          style={{
-                            padding: '3px 10px',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid rgba(16, 185, 129, 0.4)',
-                            background: 'rgba(16, 185, 129, 0.15)',
-                            color: 'var(--accent-success)',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {isSettling ? 'Saving...' : '✓ Settle'}
-                        </button>
+                        <Button size="sm" onClick={() => handleRecordSettlement(debt)} loading={isSettling}>Settle</Button>
                       </div>
                     </div>
                   );
@@ -682,25 +616,19 @@ Calculated via FinSight`;
               borderTop: '1px solid var(--divider-color)',
             }}
           >
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={handleCopySummary}
-              style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-            >
-              {copied ? '✅ Copied to Clipboard!' : '📋 Copy Summary'}
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setEndModalOpen(false)}
-              style={{ fontSize: '0.8rem', padding: '6px 20px' }}
-            >
-              Done
-            </button>
+            <Button variant="secondary" onClick={handleCopySummary}>{copied ? 'Copied' : 'Copy summary'}</Button>
+            <Button onClick={() => setEndModalOpen(false)}>Done</Button>
           </div>
         </div>
       </Modal>
+
+      <TripAddExpenseModal
+        isOpen={addExpenseOpen}
+        onClose={() => setAddExpenseOpen(false)}
+        trip={activeTrip}
+        symbol={sym}
+        onAdded={() => { fetchActiveTrip(); if (onTripChanged) onTripChanged(activeTrip); }}
+      />
     </>
   );
 };

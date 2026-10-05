@@ -94,19 +94,7 @@ const QuickAddBar = ({
           title="Speak transaction"
           whileHover={prefersReducedMotion ? {} : { scale: 1.08 }}
           whileTap={prefersReducedMotion ? {} : { scale: 0.94 }}
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            background: 'var(--bg-surface-elevated)',
-            border: '1px solid var(--border-color)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            padding: 0,
-          }}
+          className="btn-icon-round"
         >
           <svg
             width="16"
@@ -134,19 +122,7 @@ const QuickAddBar = ({
           title="Scan receipt"
           whileHover={prefersReducedMotion ? {} : { scale: 1.08 }}
           whileTap={prefersReducedMotion ? {} : { scale: 0.94 }}
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            background: 'var(--bg-surface-elevated)',
-            border: '1px solid var(--border-color)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            padding: 0,
-          }}
+          className="btn-icon-round"
         >
           <svg
             width="16"
@@ -173,16 +149,7 @@ const QuickAddBar = ({
             animate={{ scale: 1, opacity: 1 }}
             whileHover={prefersReducedMotion ? {} : { scale: 1.05 }}
             whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full)',
-              background: 'var(--accent-primary)',
-              border: 'none',
-              color: '#FFFFFF',
-              fontWeight: 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-            }}
+            className="btn btn-primary btn-sm"
           >
             Add &rarr;
           </motion.button>
