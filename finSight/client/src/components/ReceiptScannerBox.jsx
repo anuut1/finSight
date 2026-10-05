@@ -126,24 +126,63 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     setSuccess(false);
 
     try {
-      const formData = new FormData();
-      formData.append('receipt', file);
+      let scanResult = null;
 
-      const res = await api.post('/transactions/receipt/scan', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // 1. Attempt AWS S3 direct presigned upload if configured
+      try {
+        const presignRes = await api.post('/receipts/presigned-url', {
+          filename: file.name,
+          contentType: file.type || 'image/jpeg',
+        });
 
-      if (res.data?.success && res.data.data) {
-        const d = res.data.data;
+        if (presignRes.data?.success && presignRes.data.directUpload && presignRes.data.uploadUrl) {
+          const { uploadUrl, bucket, key } = presignRes.data;
+          const uploadRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': file.type || 'image/jpeg' },
+          });
+
+          if (uploadRes.ok) {
+            const analyzeRes = await api.post('/receipts/analyze-s3', {
+              bucket,
+              key,
+              contentType: file.type || 'image/jpeg',
+            });
+            if (analyzeRes.data?.success && analyzeRes.data.data) {
+              scanResult = analyzeRes.data.data;
+            }
+          }
+        }
+      } catch (s3Err) {
+        // Fall back gracefully to standard server multipart upload
+        console.debug('S3 presigned upload not available or skipped, falling back to server route:', s3Err);
+      }
+
+      // 2. Fallback to standard server multipart endpoint if S3 direct upload didn't complete
+      if (!scanResult) {
+        const formData = new FormData();
+        formData.append('receipt', file);
+
+        const res = await api.post('/transactions/receipt/scan', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        if (res.data?.success && res.data.data) {
+          scanResult = res.data.data;
+        }
+      }
+
+      if (scanResult) {
         setDraft({
           type: 'expense',
-          amount: d.amount || 0,
-          category: d.category || 'Food & Dining',
-          date: d.date || new Date().toISOString().slice(0, 10),
-          description: d.merchant || 'Receipt Expense',
-          lineItems: Array.isArray(d.lineItems) ? d.lineItems : [],
-          source: d.source || 'aws-textract',
-          note: d.note || '',
+          amount: scanResult.amount || 0,
+          category: scanResult.category || 'Food & Dining',
+          date: scanResult.date || new Date().toISOString().slice(0, 10),
+          description: scanResult.merchant || 'Receipt Expense',
+          lineItems: Array.isArray(scanResult.lineItems) ? scanResult.lineItems : [],
+          source: scanResult.source || 'aws-textract',
+          note: scanResult.note || '',
         });
       } else {
         setError('Could not extract details from receipt image.');

@@ -13,6 +13,7 @@ const goalRoutes = require('./routes/goalRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const splitRoutes = require('./routes/splitRoutes');
 const recurringRoutes = require('./routes/recurringRoutes');
+const receiptRoutes = require('./routes/receiptRoutes');
 const { authMiddleware } = require('./middleware/authMiddleware');
 
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/goals', authMiddleware, goalRoutes);
 app.use('/api/analytics', authMiddleware, analyticsRoutes);
 app.use('/api/splits', authMiddleware, splitRoutes);
 app.use('/api/recurring', authMiddleware, recurringRoutes);
+app.use('/api/receipts', authMiddleware, receiptRoutes);
 
 mongoose
   .connect(MONGO_URI)

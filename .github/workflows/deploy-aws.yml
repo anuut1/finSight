@@ -1,0 +1,98 @@
+name: Deploy FinSight to AWS
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  id-token: write # Required for AWS OIDC authentication (keyless, secure)
+  contents: read
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            finSight/server/package-lock.json
+            finSight/client/package-lock.json
+
+      - name: Install & Run Backend Tests
+        run: |
+          cd finSight/server
+          npm ci
+          npm test
+
+      - name: Install & Run Frontend Build Test
+        run: |
+          cd finSight/client
+          npm ci
+          npm run build
+
+  deploy:
+    name: Build & Deploy to AWS
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION || 'ap-south-1' }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          # Fallback to secret access keys if static credentials are used
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # ----------------------------------------------------
+      # 1. Deploy Frontend to S3 + CloudFront
+      # ----------------------------------------------------
+      - name: Build Frontend for Production
+        env:
+          VITE_API_URL: /api # Unified domain routing via CloudFront eliminates CORS
+        run: |
+          cd finSight/client
+          npm ci
+          npm run build
+
+      - name: Sync Frontend to S3
+        run: |
+          aws s3 sync finSight/client/dist/ s3://${{ secrets.AWS_FRONTEND_BUCKET }} --delete
+
+      - name: Invalidate CloudFront Cache
+        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
+        env:
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+
+      # ----------------------------------------------------
+      # 2. Build & Push Backend Container to ECR
+      # ----------------------------------------------------
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Backend Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY || 'finsight-api-prod' }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd finSight/server
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "Image pushed to ECR. AWS App Runner will automatically execute zero-downtime deployment."

@@ -183,42 +183,47 @@ Respond strictly in JSON format with fields: merchant, amount, date, category, d
 
 /**
  * Main AnalyzeExpense entry point.
- * Sends image bytes to AWS Textract AnalyzeExpense.
+ * Sends image bytes or S3 object to AWS Textract AnalyzeExpense.
+ * Automatically authenticates via IAM Role (App Runner / ECS) or local env keys.
  */
-async function analyzeReceiptExpense(buffer, mimeType = 'image/jpeg') {
-  const hasAwsConfig = Boolean(
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.AWS_REGION
-  );
+async function analyzeReceiptExpense(input, mimeType = 'image/jpeg') {
+  const isBuffer = Buffer.isBuffer(input);
+  const isS3Object = input && typeof input === 'object' && input.bucket && input.key;
 
-  if (hasAwsConfig) {
-    try {
-      const client = new TextractClient({
-        region: process.env.AWS_REGION || 'us-east-1',
-        credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        },
-      });
+  try {
+    const clientConfig = {
+      region: process.env.AWS_REGION || 'ap-south-1',
+    };
 
-      const command = new AnalyzeExpenseCommand({
-        Document: {
-          Bytes: buffer,
-        },
-      });
-
-      const response = await client.send(command);
-      return extractFromTextractResponse(response);
-    } catch (err) {
-      console.warn('AWS Textract AnalyzeExpense call failed:', err.message);
-      // Fall through to multimodal or mock fallback
+    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+      clientConfig.credentials = {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      };
     }
+
+    const client = new TextractClient(clientConfig);
+
+    const documentParam = isS3Object
+      ? { S3Object: { Bucket: input.bucket, Name: input.key } }
+      : { Bytes: isBuffer ? input : Buffer.from(input) };
+
+    const command = new AnalyzeExpenseCommand({
+      Document: documentParam,
+    });
+
+    const response = await client.send(command);
+    return extractFromTextractResponse(response);
+  } catch (err) {
+    console.warn('AWS Textract AnalyzeExpense call failed:', err.message);
+    // Fall through to multimodal or mock fallback
   }
 
-  // Fallback 1: Gemini Vision if configured
-  const geminiResult = await parseReceiptWithGemini(buffer, mimeType);
-  if (geminiResult) return geminiResult;
+  // Fallback 1: Gemini Vision if buffer is provided and configured
+  if (isBuffer) {
+    const geminiResult = await parseReceiptWithGemini(input, mimeType);
+    if (geminiResult) return geminiResult;
+  }
 
   // Fallback 2: Deterministic mock for local/preview development when no AWS credentials exist
   return {
