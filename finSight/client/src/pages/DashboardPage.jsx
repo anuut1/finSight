@@ -8,7 +8,7 @@ import TripModeWidget from '../components/TripModeWidget.jsx';
 import QuickAddBar from '../components/QuickAddBar.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
-import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
+import VoiceExpenseRecorder from '../components/VoiceExpenseRecorder.jsx';
 import ReceiptScannerBox from '../components/ReceiptScannerBox.jsx';
 import api from '../api/axios.js';
 
@@ -71,13 +71,13 @@ const DashboardPage = () => {
   // QuickAddBar interactions
   const handleQuickAddSubmit = (text) => {
     setQuickAddPrefill(text);
-    setModalTab('nl');
+    setModalTab('voice');
     setModalOpen(true);
   };
 
   const handleQuickAddVoice = () => {
     setQuickAddPrefill('');
-    setModalTab('nl');
+    setModalTab('voice');
     setModalOpen(true);
   };
 
@@ -155,33 +155,33 @@ const DashboardPage = () => {
           style={{
             display: 'flex',
             gap: '0.5rem',
-            marginBottom: '1.25rem',
+            marginBottom: '1.5rem',
             flexWrap: 'wrap',
           }}
         >
           <button
             type="button"
             className={modalTab === 'manual' ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '0.82rem', padding: '6px 14px', borderRadius: '999px' }}
+            style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
             onClick={() => setModalTab('manual')}
           >
             Manual entry
           </button>
           <button
             type="button"
-            className={modalTab === 'nl' ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '0.82rem', padding: '6px 14px', borderRadius: '999px' }}
-            onClick={() => setModalTab('nl')}
+            className={modalTab === 'voice' ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+            onClick={() => setModalTab('voice')}
           >
-            Natural language / AI
+            🎙️ Record voice
           </button>
           <button
             type="button"
             className={modalTab === 'receipt' ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '0.82rem', padding: '6px 14px', borderRadius: '999px' }}
+            style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
             onClick={() => setModalTab('receipt')}
           >
-            Receipt scanner
+            🧾 Scan receipt
           </button>
         </div>
 
@@ -193,10 +193,10 @@ const DashboardPage = () => {
           />
         )}
 
-        {modalTab === 'nl' && (
-          <NaturalLanguageQuickAdd
-            compact
+        {modalTab === 'voice' && (
+          <VoiceExpenseRecorder
             initialText={quickAddPrefill}
+            onCancel={() => setModalOpen(false)}
             onTransactionCreated={() => {
               handleTransactionCreated();
               setModalOpen(false);

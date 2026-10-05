@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Card from '../components/Card.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
-import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
+import VoiceExpenseRecorder from '../components/VoiceExpenseRecorder.jsx';
 import ReceiptScannerModal from '../components/ReceiptScannerModal.jsx';
 import UnconfirmedDraftsDrawer from '../components/UnconfirmedDraftsDrawer.jsx';
 import api from '../api/axios.js';
@@ -20,6 +20,7 @@ const TransactionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState('manual');
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -62,13 +63,15 @@ const TransactionsPage = () => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  const openNewModal = () => {
+  const openNewModal = (tab = 'manual') => {
     setEditing(null);
+    setModalTab(tab);
     setModalOpen(true);
   };
 
   const openEditModal = (tx) => {
     setEditing(tx);
+    setModalTab('manual');
     setModalOpen(true);
   };
 
@@ -144,17 +147,27 @@ const TransactionsPage = () => {
             onClick={() => setReceiptModalOpen(true)}
             style={{ fontSize: '0.85rem' }}
           >
-            🧾 Scan Receipt
+            🧾 Scan receipt
           </button>
-          <button type="button" className="btn-primary" onClick={openNewModal}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => openNewModal('voice')}
+            style={{ fontSize: '0.85rem' }}
+          >
+            🎙️ Record voice
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => openNewModal('manual')}
+          >
             + Add transaction
           </button>
         </div>
       </div>
 
       <UnconfirmedDraftsDrawer onDraftsUpdated={fetchTransactions} />
-
-      <NaturalLanguageQuickAdd onTransactionCreated={() => fetchTransactions()} />
 
       <Card style={{ padding: '1rem 1.25rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -407,12 +420,52 @@ const TransactionsPage = () => {
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
       >
-        <TransactionForm
-          initialValues={editing}
-          onSubmit={handleSave}
-          submitting={saving}
-          onCancel={() => setModalOpen(false)}
-        />
+        {!editing && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.5rem',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <button
+              type="button"
+              className={modalTab === 'manual' ? 'btn-primary' : 'btn-secondary'}
+              style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+              onClick={() => setModalTab('manual')}
+            >
+              Manual entry
+            </button>
+            <button
+              type="button"
+              className={modalTab === 'voice' ? 'btn-primary' : 'btn-secondary'}
+              style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+              onClick={() => setModalTab('voice')}
+            >
+              🎙️ Record voice
+            </button>
+          </div>
+        )}
+
+        {(editing || modalTab === 'manual') && (
+          <TransactionForm
+            initialValues={editing}
+            onSubmit={handleSave}
+            submitting={saving}
+            onCancel={() => setModalOpen(false)}
+          />
+        )}
+
+        {!editing && modalTab === 'voice' && (
+          <VoiceExpenseRecorder
+            onCancel={() => setModalOpen(false)}
+            onTransactionCreated={() => {
+              fetchTransactions();
+              setModalOpen(false);
+            }}
+          />
+        )}
       </Modal>
 
       <ReceiptScannerModal
