@@ -16,6 +16,8 @@ dist/
 **/dist/
 dist-ssr/
 build/
+coverage/
+**/coverage/
 
 # Environment files
 .env
