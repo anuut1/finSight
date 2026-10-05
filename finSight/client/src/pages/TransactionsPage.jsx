@@ -3,7 +3,6 @@ import Card from '../components/Card.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
-import BankAlertImportModal from '../components/BankAlertImportModal.jsx';
 import ReceiptScannerModal from '../components/ReceiptScannerModal.jsx';
 import UnconfirmedDraftsDrawer from '../components/UnconfirmedDraftsDrawer.jsx';
 import api from '../api/axios.js';
@@ -21,7 +20,6 @@ const TransactionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [smsModalOpen, setSmsModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -84,6 +82,8 @@ const TransactionsPage = () => {
             ...prev,
             items: prev.items.map((t) => (t._id === editing._id ? res.data.data : t)),
           }));
+          setModalOpen(false);
+          return res.data;
         }
       } else {
         const res = await api.post('/transactions', payload);
@@ -92,11 +92,10 @@ const TransactionsPage = () => {
             ...prev,
             items: [res.data.data, ...prev.items].slice(0, limit),
           }));
+          setModalOpen(false);
+          return res.data;
         }
       }
-      setModalOpen(false);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save transaction');
     } finally {
       setSaving(false);
     }
@@ -146,14 +145,6 @@ const TransactionsPage = () => {
             style={{ fontSize: '0.85rem' }}
           >
             🧾 Scan Receipt
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setSmsModalOpen(true)}
-            style={{ fontSize: '0.85rem' }}
-          >
-            📨 Paste Bank SMS
           </button>
           <button type="button" className="btn-primary" onClick={openNewModal}>
             + Add transaction
@@ -416,14 +407,13 @@ const TransactionsPage = () => {
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
       >
-        <TransactionForm initialValues={editing} onSubmit={handleSave} submitting={saving} />
+        <TransactionForm
+          initialValues={editing}
+          onSubmit={handleSave}
+          submitting={saving}
+          onCancel={() => setModalOpen(false)}
+        />
       </Modal>
-
-      <BankAlertImportModal
-        isOpen={smsModalOpen}
-        onClose={() => setSmsModalOpen(false)}
-        onTransactionCreated={() => fetchTransactions()}
-      />
 
       <ReceiptScannerModal
         isOpen={receiptModalOpen}

@@ -1,94 +1,388 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Input from './Input.jsx';
+import Button from './Button.jsx';
 
-const TransactionForm = ({ initialValues, onSubmit, submitting }) => {
-  const [form, setForm] = useState(
-    initialValues || {
-      type: 'expense',
-      category: '',
-      amount: '',
-      description: '',
-      date: new Date().toISOString().slice(0, 10),
-      mood: 'neutral',
-    }
+const EXPENSE_CATEGORIES = [
+  'Food & Dining',
+  'Groceries',
+  'Shopping',
+  'Travel',
+  'Entertainment',
+  'Bills & Utilities',
+  'Healthcare',
+  'Education',
+  'Personal Care',
+  'Investment',
+  'Shared',
+  'Other',
+];
+
+const INCOME_CATEGORIES = [
+  'Salary',
+  'Freelance',
+  'Investment',
+  'Gift',
+  'Refund',
+  'Other',
+];
+
+/**
+ * Quiet Ledger Transaction Form
+ *
+ * Provides resilient, accessible manual transaction entry and editing.
+ * Validates inputs, handles category defaults, and displays inline errors.
+ */
+const TransactionForm = ({ initialValues, onSubmit, submitting = false, onCancel }) => {
+  const isEditing = Boolean(initialValues && initialValues._id);
+
+  const [type, setType] = useState(initialValues?.type || 'expense');
+  const [amount, setAmount] = useState(initialValues?.amount ? String(initialValues.amount) : '');
+  const [category, setCategory] = useState(
+    initialValues?.category || (initialValues?.type === 'income' ? 'Salary' : 'Food & Dining')
   );
+  const [customCategory, setCustomCategory] = useState('');
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [description, setDescription] = useState(initialValues?.description || '');
+  const [date, setDate] = useState(
+    initialValues?.date
+      ? new Date(initialValues.date).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10)
+  );
+  const [mood, setMood] = useState(initialValues?.mood || 'neutral');
+  const [error, setError] = useState('');
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+  // Sync state if initialValues changes (e.g. user opens modal for different transaction)
+  useEffect(() => {
+    if (initialValues) {
+      setType(initialValues.type || 'expense');
+      setAmount(initialValues.amount ? String(initialValues.amount) : '');
+      const cat = initialValues.category || 'Food & Dining';
+      const catList = initialValues.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+      if (catList.includes(cat)) {
+        setCategory(cat);
+        setIsCustomCategory(false);
+      } else {
+        setCategory('Other');
+        setIsCustomCategory(true);
+        setCustomCategory(cat);
+      }
+      setDescription(initialValues.description || '');
+      setDate(
+        initialValues.date
+          ? new Date(initialValues.date).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10)
+      );
+      setMood(initialValues.mood || 'neutral');
+    }
+  }, [initialValues]);
+
+  // Handle switching type
+  const handleTypeChange = (newType) => {
+    setType(newType);
+    setError('');
+    if (!isEditing) {
+      if (newType === 'income') {
+        setCategory('Salary');
+        setIsCustomCategory(false);
+      } else {
+        setCategory('Food & Dining');
+        setIsCustomCategory(false);
+      }
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleCategorySelect = (val) => {
+    setCategory(val);
+    setError('');
+    if (val === 'Other') {
+      setIsCustomCategory(true);
+    } else {
+      setIsCustomCategory(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({
-      ...form,
-      amount: Number(form.amount),
-    });
+    setError('');
+
+    const parsedAmount = Number(amount);
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError('Please enter a valid amount greater than 0.');
+      return;
+    }
+
+    const finalCategory = isCustomCategory ? customCategory.trim() : category.trim();
+    if (!finalCategory) {
+      setError('Please select or enter a category.');
+      return;
+    }
+
+    if (!date) {
+      setError('Please select a valid date.');
+      return;
+    }
+
+    const payload = {
+      type,
+      category: finalCategory,
+      amount: parsedAmount,
+      description: description.trim() || undefined,
+      date,
+      mood,
+    };
+
+    try {
+      if (onSubmit) {
+        await onSubmit(payload);
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to save transaction. Please check your inputs.';
+      setError(msg);
+    }
   };
+
+  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
-        <select
-          name="type"
-          value={form.type}
-          onChange={handleChange}
-          className="input-glass"
-          style={{ flex: 1 }}
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Type Toggle (Expense / Income) */}
+      <div>
+        <label
+          style={{
+            display: 'block',
+            marginBottom: '6px',
+            fontSize: '0.88rem',
+            fontWeight: 500,
+            color: 'var(--text-primary)',
+          }}
         >
-          <option value="income">Income</option>
-          <option value="expense">Expense</option>
-        </select>
-        <input
-          name="category"
-          value={form.category}
-          onChange={handleChange}
-          className="input-glass"
-          placeholder="Category"
-          style={{ flex: 1 }}
-        />
+          Transaction Type
+        </label>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+            background: 'var(--bg-surface-elevated, #F4F4F2)',
+            padding: '4px',
+            borderRadius: '999px',
+            border: '1px solid var(--border-color)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => handleTypeChange('expense')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '999px',
+              border: 'none',
+              background: type === 'expense' ? 'var(--color-ink)' : 'transparent',
+              color: type === 'expense' ? '#FFFFFF' : 'var(--text-secondary)',
+              fontWeight: 500,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              transition: 'background 150ms ease, color 150ms ease',
+            }}
+          >
+            Expense
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTypeChange('income')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '999px',
+              border: 'none',
+              background: type === 'income' ? 'var(--color-ink)' : 'transparent',
+              color: type === 'income' ? '#FFFFFF' : 'var(--text-secondary)',
+              fontWeight: 500,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              transition: 'background 150ms ease, color 150ms ease',
+            }}
+          >
+            Income
+          </button>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
-        <input
-          type="number"
+
+      {/* Amount and Date */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
+        <Input
+          label="Amount (₹)"
+          id="tx-amount"
           name="amount"
-          value={form.amount}
-          onChange={handleChange}
-          className="input-glass"
-          placeholder="Amount"
-          style={{ flex: 1 }}
+          type="number"
+          step="any"
+          min="0.01"
+          placeholder="0.00"
+          value={amount}
+          onChange={(e) => {
+            setAmount(e.target.value);
+            setError('');
+          }}
+          required
+          autoFocus
         />
-        <input
-          type="date"
+
+        <Input
+          label="Date"
+          id="tx-date"
           name="date"
-          value={form.date}
-          onChange={handleChange}
-          className="input-glass"
-          style={{ flex: 1 }}
+          type="date"
+          value={date}
+          onChange={(e) => {
+            setDate(e.target.value);
+            setError('');
+          }}
+          required
         />
       </div>
-      <input
+
+      {/* Category Dropdown */}
+      <div className="input-field" style={{ width: '100%' }}>
+        <label
+          htmlFor="tx-category"
+          style={{
+            display: 'block',
+            marginBottom: '6px',
+            fontSize: '0.88rem',
+            fontWeight: 500,
+            color: 'var(--text-primary)',
+          }}
+        >
+          Category <span style={{ color: 'var(--color-warning)' }}>*</span>
+        </label>
+        <select
+          id="tx-category"
+          value={isCustomCategory ? 'Other' : category}
+          onChange={(e) => handleCategorySelect(e.target.value)}
+          className="form-input"
+          style={{
+            width: '100%',
+            height: '52px',
+            padding: '0 16px',
+            borderRadius: 'var(--radius-input, 14px)',
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            fontSize: '0.95rem',
+            fontFamily: 'inherit',
+            outline: 'none',
+          }}
+        >
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* If "Other" category is chosen, allow typing custom name */}
+      {isCustomCategory && (
+        <Input
+          label="Custom Category Name"
+          id="tx-custom-category"
+          placeholder="e.g. Freelance Client, Pet Supplies"
+          value={customCategory}
+          onChange={(e) => {
+            setCustomCategory(e.target.value);
+            setError('');
+          }}
+          required
+        />
+      )}
+
+      {/* Description */}
+      <Input
+        label="Description (optional)"
+        id="tx-desc"
         name="description"
-        value={form.description}
-        onChange={handleChange}
-        className="input-glass"
-        placeholder="Description"
+        placeholder={type === 'expense' ? 'e.g. Swiggy lunch, Uber to airport' : 'e.g. October monthly salary'}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
       />
-      <select
-        name="mood"
-        value={form.mood}
-        onChange={handleChange}
-        className="input-glass"
-      >
-        <option value="happy">Good</option>
-        <option value="neutral">Neutral</option>
-        <option value="stressed">Stressed</option>
-      </select>
-      <button type="submit" className="btn-primary" disabled={submitting}>
-        {submitting ? 'Saving...' : 'Save transaction'}
-      </button>
+
+      {/* Mood / Sentiment (optional) */}
+      <div className="input-field">
+        <label
+          htmlFor="tx-mood"
+          style={{
+            display: 'block',
+            marginBottom: '6px',
+            fontSize: '0.88rem',
+            fontWeight: 500,
+            color: 'var(--text-primary)',
+          }}
+        >
+          Feeling / Context
+        </label>
+        <select
+          id="tx-mood"
+          value={mood}
+          onChange={(e) => setMood(e.target.value)}
+          className="form-input"
+          style={{
+            width: '100%',
+            height: '52px',
+            padding: '0 16px',
+            borderRadius: 'var(--radius-input, 14px)',
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            fontSize: '0.95rem',
+            fontFamily: 'inherit',
+            outline: 'none',
+          }}
+        >
+          <option value="happy">Good / Necessary</option>
+          <option value="neutral">Neutral / Everyday</option>
+          <option value="stressed">Stressed / Impulse</option>
+        </select>
+      </div>
+
+      {/* Inline Form Error */}
+      {error && (
+        <div
+          role="alert"
+          style={{
+            fontSize: '0.88rem',
+            color: 'var(--color-warning)',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 12px',
+            borderRadius: 'var(--radius-input, 14px)',
+            background: 'rgba(180, 83, 9, 0.08)',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '0.5rem' }}>
+        {onCancel && (
+          <Button variant="secondary" onClick={onCancel} type="button">
+            Cancel
+          </Button>
+        )}
+        <Button variant="primary" type="submit" loading={submitting} disabled={submitting}>
+          {isEditing ? 'Save Changes' : 'Save Transaction'}
+        </Button>
+      </div>
     </form>
   );
 };
 
 export default TransactionForm;
-

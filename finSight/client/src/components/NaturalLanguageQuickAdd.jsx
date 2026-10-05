@@ -113,6 +113,13 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
     };
   }, []);
 
+  useEffect(() => {
+    if (initialText && initialText.trim()) {
+      setInput(initialText);
+      handleParse(initialText);
+    }
+  }, [initialText]);
+
   const toggleListening = () => {
     if (!speechSupported) {
       setParseError('Voice input is not supported in this browser. Please type your expense.');

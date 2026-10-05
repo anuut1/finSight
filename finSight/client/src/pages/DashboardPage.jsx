@@ -9,7 +9,6 @@ import QuickAddBar from '../components/QuickAddBar.jsx';
 import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import NaturalLanguageQuickAdd from '../components/NaturalLanguageQuickAdd.jsx';
-import BankAlertBox from '../components/BankAlertBox.jsx';
 import ReceiptScannerBox from '../components/ReceiptScannerBox.jsx';
 import api from '../api/axios.js';
 
@@ -62,9 +61,8 @@ const DashboardPage = () => {
       if (res.data?.success) {
         handleTransactionCreated();
         setModalOpen(false);
+        return res.data;
       }
-    } catch {
-      // error handled in form
     } finally {
       setSaving(false);
     }
@@ -185,26 +183,22 @@ const DashboardPage = () => {
           >
             Receipt scanner
           </button>
-          <button
-            type="button"
-            className={modalTab === 'sms' ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '0.82rem', padding: '6px 14px', borderRadius: '999px' }}
-            onClick={() => setModalTab('sms')}
-          >
-            Bank SMS
-          </button>
         </div>
 
         {modalTab === 'manual' && (
-          <TransactionForm onSubmit={handleManualAddSubmit} submitting={saving} />
+          <TransactionForm
+            onSubmit={handleManualAddSubmit}
+            submitting={saving}
+            onCancel={() => setModalOpen(false)}
+          />
         )}
 
         {modalTab === 'nl' && (
           <NaturalLanguageQuickAdd
             compact
             initialText={quickAddPrefill}
-            onTransactionCreated={(newTx) => {
-              handleTransactionCreated(newTx);
+            onTransactionCreated={() => {
+              handleTransactionCreated();
               setModalOpen(false);
             }}
           />
@@ -213,18 +207,8 @@ const DashboardPage = () => {
         {modalTab === 'receipt' && (
           <ReceiptScannerBox
             compact
-            onTransactionCreated={(newTx) => {
-              handleTransactionCreated(newTx);
-              setModalOpen(false);
-            }}
-          />
-        )}
-
-        {modalTab === 'sms' && (
-          <BankAlertBox
-            compact
-            onTransactionCreated={(newTx) => {
-              handleTransactionCreated(newTx);
+            onTransactionCreated={() => {
+              handleTransactionCreated();
               setModalOpen(false);
             }}
           />
