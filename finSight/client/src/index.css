@@ -604,6 +604,22 @@ tbody tr:hover {
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 768px) {
+  .quiet-sidebar {
+    display: none !important;
+  }
+
+  .quiet-bottom-nav {
+    display: flex !important;
+  }
+
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-shell > main {
+    padding-bottom: 80px !important;
+  }
+
   .grid-2,
   .grid-3,
   .grid-4 {
@@ -631,7 +647,8 @@ tbody tr:hover {
     padding: var(--spacing-lg);
   }
 
-  .dashboard-main-grid {
+  .dashboard-main-grid,
+  .dashboard-two-col-grid {
     grid-template-columns: 1fr !important;
   }
 }

@@ -1,17 +1,22 @@
-import { motion, useReducedMotion } from 'motion/react';
+import { useReducedMotion } from 'motion/react';
 
-const ProgressBar = ({ value = 0, tone = 'primary', height = 6 }) => {
+/**
+ * Quiet Ledger Progress Bar
+ *
+ * Minimal, thin progress bar with smooth filling and no gradient washes.
+ */
+const ProgressBar = ({ value = 0, tone = 'primary', height = 4, className = '', style = {} }) => {
   const prefersReducedMotion = useReducedMotion();
   const clamped = Math.max(0, Math.min(100, Number(value) || 0));
 
-  const toneGradients = {
-    primary: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-primary-light) 100%)',
-    positive: 'linear-gradient(90deg, var(--color-positive) 0%, #34D399 100%)',
-    negative: 'linear-gradient(90deg, var(--color-negative) 0%, #FB7185 100%)',
-    warning: 'linear-gradient(90deg, var(--color-warning) 0%, #FBBF24 100%)',
+  const toneColors = {
+    primary: 'var(--color-ink)',
+    positive: 'var(--color-positive)',
+    warning: 'var(--color-warning)',
+    negative: 'var(--color-warning)',
   };
 
-  const fillBackground = toneGradients[tone] || toneGradients.primary;
+  const fillBackground = toneColors[tone] || toneColors.primary;
 
   return (
     <div
@@ -19,27 +24,24 @@ const ProgressBar = ({ value = 0, tone = 'primary', height = 6 }) => {
       aria-valuenow={Math.round(clamped)}
       aria-valuemin={0}
       aria-valuemax={100}
+      className={className}
       style={{
         width: '100%',
         height,
-        borderRadius: 'var(--radius-full)',
-        background: 'var(--track-bg)',
+        borderRadius: 'var(--radius-full, 999px)',
+        background: 'var(--track-bg, #E8E8E4)',
         overflow: 'hidden',
         position: 'relative',
+        ...style,
       }}
     >
-      <motion.div
-        initial={prefersReducedMotion ? { width: `${clamped}%` } : { width: 0 }}
-        animate={{ width: `${clamped}%` }}
-        transition={
-          prefersReducedMotion
-            ? { duration: 0 }
-            : { duration: 0.35, ease: [0.16, 1, 0.3, 1] }
-        }
+      <div
         style={{
           height: '100%',
-          borderRadius: 'var(--radius-full)',
+          width: `${clamped}%`,
+          borderRadius: 'var(--radius-full, 999px)',
           background: fillBackground,
+          transition: prefersReducedMotion ? 'none' : 'width 300ms cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       />
     </div>

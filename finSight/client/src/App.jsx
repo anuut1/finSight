@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import TransactionsPage from './pages/TransactionsPage.jsx';
 import BudgetsPage from './pages/BudgetsPage.jsx';
+import BillsPage from './pages/BillsPage.jsx';
 import GoalsPage from './pages/GoalsPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import SplitsPage from './pages/SplitsPage.jsx';
@@ -42,6 +43,14 @@ function App() {
               element={
                 <Layout>
                   <TransactionsPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/bills"
+              element={
+                <Layout>
+                  <BillsPage />
                 </Layout>
               }
             />

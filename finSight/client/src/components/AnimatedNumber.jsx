@@ -2,25 +2,24 @@ import { useEffect, useState, useRef } from 'react';
 import { useReducedMotion } from 'motion/react';
 
 /**
- * AnimatedNumber
- * Smoothly counts up once on load or when target value changes.
+ * Quiet Ledger AnimatedNumber
+ * Smoothly counts up once on load or when target value changes (150-250ms).
  * Formats as Indian Rupee (INR) currency with tabular figures.
  */
 const AnimatedNumber = ({
   value = 0,
-  duration = 240, // 240ms within the 150-250ms guideline
+  duration = 220,
   prefix = '₹',
   className = '',
   style = {},
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const numericTarget = typeof value === 'number' ? value : Number(value) || 0;
-  const [displayValue, setDisplayValue] = useState(prefersReducedMotion ? numericTarget : 0);
+  const [displayValue, setDisplayValue] = useState(numericTarget);
   const prevTargetRef = useRef(numericTarget);
 
   useEffect(() => {
     if (prefersReducedMotion) {
-      setDisplayValue(numericTarget);
       return;
     }
 
@@ -51,8 +50,9 @@ const AnimatedNumber = ({
     };
   }, [numericTarget, duration, prefersReducedMotion]);
 
-  const formatted = Math.abs(displayValue).toLocaleString('en-IN');
-  const isNegative = displayValue < 0;
+  const effectiveValue = prefersReducedMotion ? numericTarget : displayValue;
+  const formatted = Math.abs(effectiveValue).toLocaleString('en-IN');
+  const isNegative = effectiveValue < 0;
 
   return (
     <span

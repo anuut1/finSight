@@ -1,89 +1,125 @@
 import { NavLink } from 'react-router-dom';
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { to: '/transactions', label: 'Transactions', icon: '🧾' },
-  { to: '/budgets', label: 'Budgets', icon: '🎯' },
-  { to: '/goals', label: 'Goals', icon: '🌱' },
-  { to: '/splits', label: 'Splits & Trips', icon: '👥' },
-  { to: '/analytics', label: 'Analytics', icon: '📈' },
+/**
+ * Quiet Ledger Slim Left Navigation (200px)
+ *
+ * - Wordmark "FinSight" in Instrument Serif
+ * - Links: Home, Transactions, Bills & subscriptions, Budgets, Goals, Splits & trips, Insights
+ * - Active item is bold ink; others muted
+ * - On mobile: responsive bottom bar
+ */
+const navItems = [
+  { to: '/dashboard', label: 'Home' },
+  { to: '/transactions', label: 'Transactions' },
+  { to: '/bills', label: 'Bills & subscriptions' },
+  { to: '/budgets', label: 'Budgets' },
+  { to: '/goals', label: 'Goals' },
+  { to: '/splits', label: 'Splits & trips' },
+  { to: '/analytics', label: 'Insights' },
 ];
 
 const Sidebar = () => {
   return (
-    <aside
-      style={{
-        width: 240,
-        padding: '1.25rem 1rem',
-        position: 'sticky',
-        top: 0,
-        alignSelf: 'flex-start',
-        height: '100vh',
-      }}
-    >
-      <div
-        className="ledger-card"
+    <>
+      {/* Desktop Slim Sidebar (200px) */}
+      <aside
+        className="quiet-sidebar"
         style={{
-          padding: '1.25rem 0.9rem',
+          width: '200px',
+          minWidth: '200px',
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
+          background: 'transparent',
+          borderRight: '1px solid var(--border-color)',
+          padding: '2rem 1.25rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.35rem',
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-lg, 14px)',
-          boxShadow: 'var(--shadow-xs)',
+          boxSizing: 'border-box',
+          zIndex: 40,
         }}
       >
-        <div
-          style={{
-            fontSize: '0.72rem',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            marginBottom: '0.5rem',
-            paddingLeft: '0.65rem',
-            fontWeight: 700,
-          }}
-        >
-          Menu
-        </div>
-        {links.map((link) => (
+        {/* Wordmark in serif */}
+        <div style={{ marginBottom: '2.5rem', paddingLeft: '0.25rem' }}>
           <NavLink
-            key={link.to}
-            to={link.to}
-            className="sidebar-link"
+            to="/dashboard"
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '1.75rem',
+              fontWeight: 400,
+              color: 'var(--text-primary)',
+              textDecoration: 'none',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            FinSight
+          </NavLink>
+        </div>
+
+        {/* Navigation list */}
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              style={({ isActive }) => ({
+                display: 'block',
+                padding: '0.35rem 0.25rem',
+                fontSize: '0.92rem',
+                fontFamily: 'var(--font-sans)',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                fontWeight: isActive ? 600 : 400,
+                textDecoration: 'none',
+                transition: 'color var(--transition-fast)',
+                letterSpacing: '-0.01em',
+              })}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav
+        className="quiet-bottom-nav"
+        style={{
+          display: 'none',
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '60px',
+          background: 'var(--bg-surface)',
+          borderTop: '1px solid var(--border-color)',
+          zIndex: 100,
+          padding: '0 0.5rem',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+        }}
+      >
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
             style={({ isActive }) => ({
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0.6rem 0.85rem',
-              borderRadius: 'var(--radius-md, 12px)',
-              fontSize: '0.88rem',
-              color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-              background: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
-              border: isActive ? '1px solid var(--border-strong)' : '1px solid transparent',
-              transition: 'all var(--transition-fast)',
-              fontWeight: isActive ? 600 : 500,
+              justifyContent: 'center',
+              padding: '6px 4px',
+              fontSize: '0.72rem',
+              color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+              fontWeight: isActive ? 600 : 400,
               textDecoration: 'none',
+              textAlign: 'center',
             })}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <span style={{ fontSize: '1rem' }}>{link.icon}</span>
-              <span>{link.label}</span>
-            </div>
-            <span
-              style={{
-                fontSize: '0.85rem',
-                color: 'var(--text-muted)',
-                opacity: 0.6,
-              }}
-            >
-              &rarr;
-            </span>
+            {item.label.split(' ')[0]}
           </NavLink>
         ))}
-      </div>
-    </aside>
+      </nav>
+    </>
   );
 };
 
