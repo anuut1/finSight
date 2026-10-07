@@ -1,6 +1,12 @@
 @import './styles/variables.css';
 @import './styles/components.css';
 
+/* ==================== BUTTON MOTION TOKENS ==================== */
+:root {
+  --btn-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --btn-dur-fast: 120ms;
+  --btn-dur: 180ms;
+}
 
 /* ==================== RESET & BASE ==================== */
 *,
@@ -45,20 +51,6 @@ a:hover {
 button {
   font-family: inherit;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-              background var(--transition-fast),
-              border-color var(--transition-fast),
-              color var(--transition-fast),
-              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity var(--transition-fast);
-}
-
-button:active:not(:disabled) {
-  transform: scale(0.965) translateY(0.5px);
-  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1);
 }
 
 input,
@@ -122,199 +114,268 @@ p {
   border-color: var(--border-strong);
 }
 
-/* ==================== BUTTONS (PILL-SHAPED) ==================== */
+/* ==================== BUTTONS (SINGLE SOURCE OF TRUTH) ==================== */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 10px 22px;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 20px;
   border-radius: var(--radius-pill, 999px);
   border: 1px solid transparent;
   font-family: var(--font-sans);
   font-size: 0.9rem;
   font-weight: 500;
   letter-spacing: -0.01em;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-              background var(--transition-fast),
-              border-color var(--transition-fast),
-              color var(--transition-fast),
-              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity var(--transition-fast);
+  line-height: 1;
+  background-color: transparent;
+  color: var(--text-primary);
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
   outline: none;
+  outline-offset: 0px;
   text-decoration: none;
+  box-shadow: none;
+  transform: translateY(0) scale(1);
+  transition: transform var(--btn-dur) var(--btn-ease),
+              background-color var(--btn-dur) var(--btn-ease),
+              border-color var(--btn-dur) var(--btn-ease),
+              box-shadow var(--btn-dur) var(--btn-ease),
+              opacity var(--btn-dur) var(--btn-ease),
+              outline-offset var(--btn-dur-fast) var(--btn-ease);
   -webkit-tap-highlight-color: transparent;
 }
 
-.btn:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-
-/* Tactile micro-press feedback when buttons are clicked */
-.btn:active:not(:disabled),
-.btn-primary:active:not(:disabled),
-.btn-secondary:active:not(:disabled),
-.btn-outline:active:not(:disabled),
-.btn-ghost:active:not(:disabled),
-.btn-danger:active:not(:disabled),
-.btn-success:active:not(:disabled) {
-  transform: scale(0.965) translateY(0.5px);
-  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 0.08s ease;
-}
-
-/* ==================== BUTTON VARIANTS ==================== */
-.btn-primary {
-  background: var(--accent-primary);
-  color: var(--text-inverse);
-  border: 1px solid var(--accent-primary);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-primary-light);
-  border-color: var(--accent-primary-light);
-}
-
-.btn-primary:active:not(:disabled) {
-  box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.08);
-}
-
-.btn-primary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-
-.btn-secondary:active:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: var(--border-strong);
-}
-
-.btn-outline:active:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-primary);
-}
-
-.btn-ghost:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.btn-ghost:active:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.btn-success {
-  background: var(--accent-primary);
-  color: var(--bg-primary);
-  border-radius: var(--radius-full);
-}
-
-.btn-success:hover:not(:disabled) {
-  background: var(--accent-primary-light);
-  transform: translateY(-1px);
-}
-
-.btn-danger {
-  background: transparent;
-  border: 1px solid var(--accent-danger);
-  color: var(--accent-danger);
-  border-radius: var(--radius-full);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: rgba(244, 63, 94, 0.12);
-  transform: translateY(-1px);
-}
-
-.btn-danger:active:not(:disabled) {
-  background: rgba(244, 63, 94, 0.18);
-}
-
+/* Sizing tokens */
 .btn-sm {
-  padding: 0.5rem 1rem;
-  font-size: 0.85rem;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 16px;
+  font-size: 0.82rem;
+}
+
+.btn-md {
+  min-height: 44px;
+  height: 44px;
+  padding: 0 20px;
+  font-size: 0.9rem;
 }
 
 .btn-lg {
-  padding: 1rem 2rem;
-  font-size: 1rem;
-  border-radius: var(--radius-xl);
+  min-height: 52px;
+  height: 52px;
+  padding: 0 24px;
+  font-size: 0.95rem;
+  border-radius: var(--radius-pill, 999px);
 }
 
 .btn-block {
   width: 100%;
 }
 
-/* ==================== BUTTON FLOWING RIPPLE WAVES ==================== */
-.btn-ripple-wave {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  transform: translate(-50%, -50%) scale(0);
-  animation: btnRippleFlow 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
-  z-index: 10;
-}
-
-.btn-ripple-wave.btn-ripple-light {
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0) 100%);
-}
-
-.btn-ripple-wave.btn-ripple-dark {
-  background: radial-gradient(circle, rgba(20, 21, 26, 0.14) 0%, rgba(20, 21, 26, 0.05) 50%, rgba(20, 21, 26, 0) 100%);
-}
-
-.btn-ripple-wave.btn-ripple-dark-theme {
-  background: radial-gradient(circle, rgba(250, 250, 248, 0.2) 0%, rgba(250, 250, 248, 0.07) 50%, rgba(250, 250, 248, 0) 100%);
-}
-
-.btn-ripple-wave.btn-ripple-danger {
-  background: radial-gradient(circle, rgba(180, 83, 9, 0.22) 0%, rgba(180, 83, 9, 0.08) 50%, rgba(180, 83, 9, 0) 100%);
-}
-
-@keyframes btnRippleFlow {
-  0% {
-    transform: translate(-50%, -50%) scale(0);
-    opacity: 0.4;
+/* Touch targets: at least 44px high on mobile except in dense rows */
+@media (max-width: 480px) {
+  .btn:not(.dense-row .btn-sm):not(td .btn-sm) {
+    min-height: 44px;
   }
-  40% {
-    opacity: 0.3;
+}
+
+/* Focus-visible: 2px accent outline with 2px offset, animated with outline-offset, never removed */
+.btn:focus-visible,
+.btn-icon-round:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Hover (only when (hover: hover)): translateY(-1px), slightly stronger border or background, soft shadow increase. No scaling above 1.02 */
+@media (hover: hover) {
+  .btn:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(20, 21, 26, 0.04));
+  }
+
+  .btn-primary:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    background-color: var(--accent-primary-light);
+    border-color: var(--accent-primary-light);
+    box-shadow: var(--shadow-md, 0 2px 8px rgba(20, 21, 26, 0.08));
+  }
+
+  .btn-secondary:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]),
+  .btn-outline:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    background-color: var(--bg-hover);
+    border-color: var(--border-strong);
+  }
+
+  .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    background-color: var(--bg-hover);
+    border-color: transparent;
+  }
+
+  .btn-danger:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    background-color: rgba(244, 63, 94, 0.12);
+    border-color: var(--color-warning);
+  }
+
+  .btn-icon-round:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    transform: translateY(-1px);
+    background-color: var(--bg-hover);
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(20, 21, 26, 0.04));
+  }
+
+  .btn-icon-round:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) svg,
+  .btn-icon-round:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) .btn-icon {
+    transform: scale(1.06);
+  }
+}
+
+/* Active/press: translateY(0) scale(0.98), duration 80-120ms */
+.btn:active:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]),
+.btn-icon-round:active:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+  transform: translateY(0) scale(0.98);
+  transition: transform var(--btn-dur-fast) var(--btn-ease),
+              background-color var(--btn-dur-fast) var(--btn-ease),
+              border-color var(--btn-dur-fast) var(--btn-ease),
+              box-shadow var(--btn-dur-fast) var(--btn-ease);
+}
+
+.btn-icon-round:active:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) svg,
+.btn-icon-round:active:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) .btn-icon {
+  transform: scale(1);
+  transition: transform var(--btn-dur-fast) var(--btn-ease);
+}
+
+/* Variants */
+.btn-primary {
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
+  border: 1px solid var(--accent-primary);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid transparent;
+}
+
+.btn-danger {
+  background-color: transparent;
+  color: var(--color-warning);
+  border: 1px solid var(--border-color);
+}
+
+.btn-success {
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border: 1px solid var(--accent-primary);
+}
+
+/* Disabled: opacity 0.5, no hover or press motion, cursor not-allowed */
+.btn:disabled,
+.btn[aria-disabled="true"],
+.btn-icon-round:disabled,
+.btn-icon-round[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+/* Loading state: keeps width, aria-busy="true", disabled cursor, no layout jump */
+.btn[aria-busy="true"],
+.btn.is-loading {
+  cursor: wait;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btnSpin 0.75s linear infinite, btnFadeIn var(--btn-dur-fast) var(--btn-ease);
+}
+
+/* Icon-only circle buttons (.btn-icon-round) */
+.btn-icon-round {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background-color: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+  outline-offset: 0px;
+  text-decoration: none;
+  user-select: none;
+  transform: translateY(0) scale(1);
+  transition: transform var(--btn-dur) var(--btn-ease),
+              background-color var(--btn-dur) var(--btn-ease),
+              border-color var(--btn-dur) var(--btn-ease),
+              box-shadow var(--btn-dur) var(--btn-ease),
+              opacity var(--btn-dur) var(--btn-ease),
+              outline-offset var(--btn-dur-fast) var(--btn-ease);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-icon-round svg,
+.btn-icon-round .btn-icon {
+  transition: transform var(--btn-dur) var(--btn-ease);
+}
+
+/* Success feedback: short fade for label swap */
+.btn-feedback-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: btnFeedbackFade 1.2s var(--btn-ease);
+}
+
+@keyframes btnFeedbackFade {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(0);
   }
   100% {
-    transform: translate(-50%, -50%) scale(2.4);
-    opacity: 0;
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -326,6 +387,51 @@ p {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* Group select interactive button in Splits */
+.btn-group-select {
+  transition: transform var(--btn-dur-fast) var(--btn-ease),
+              background-color var(--btn-dur) var(--btn-ease),
+              border-color var(--btn-dur) var(--btn-ease),
+              box-shadow var(--btn-dur) var(--btn-ease),
+              outline-offset var(--btn-dur-fast) var(--btn-ease);
+  outline: 2px solid transparent;
+  outline-offset: 0px;
+}
+@media (hover: hover) {
+  .btn-group-select:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(20, 21, 26, 0.04));
+  }
+}
+.btn-group-select:active {
+  transform: translateY(0) scale(0.99);
+}
+.btn-group-select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Respect prefers-reduced-motion: reduce. Remove transforms and keep only instant color changes */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn-icon-round,
+  .btn-icon-round svg,
+  .btn-icon-round .btn-icon,
+  .btn-feedback-swap,
+  .btn-group-select {
+    transform: none !important;
+    transition: background-color 0s, border-color 0s, box-shadow 0s, opacity 0s !important;
+  }
+  .btn:hover,
+  .btn:active,
+  .btn-icon-round:hover,
+  .btn-icon-round:active,
+  .btn-group-select:hover,
+  .btn-group-select:active {
+    transform: none !important;
   }
 }
 
@@ -786,21 +892,3 @@ tbody tr:hover {
   }
 }
 
-/* ==================== BUTTON SIZE SYSTEM (single source of truth) ==================== */
-.btn { min-height: 44px; padding: 0 22px; }
-.btn-sm { min-height: 36px; padding: 0 16px; font-size: 0.82rem; }
-.btn-lg { min-height: 52px; padding: 0 26px; font-size: 0.95rem; }
-.btn-danger { min-height: 44px; }
-.btn-icon-round {
-  width: 36px; height: 36px; padding: 0; flex: 0 0 36px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 50%; border: 1px solid var(--border-color);
-  background: transparent; color: var(--text-primary); cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background var(--transition-fast), border-color var(--transition-fast);
-  -webkit-tap-highlight-color: transparent;
-}
-.btn-icon-round:hover { background: var(--bg-hover); border-color: var(--border-strong); }
-.btn-icon-round:active:not(:disabled) { transform: scale(0.92); }
-.btn-icon-round:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
