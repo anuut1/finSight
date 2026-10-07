@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion as Motion, useReducedMotion } from 'motion/react';
+import Button from './Button.jsx';
 
 /**
  * ReviewCard
@@ -77,7 +78,7 @@ const ReviewCard = ({
       </div>
 
       {/* Foreground Swipeable Card */}
-      <motion.div
+      <Motion.div
         drag={prefersReducedMotion ? false : 'x'}
         dragConstraints={{ left: -100, right: 100 }}
         dragElastic={0.4}
@@ -174,63 +175,47 @@ const ReviewCard = ({
             ₹{Number(draft.amount || 0).toLocaleString('en-IN')}
           </div>
 
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <motion.button
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => onEdit(draft)}
               aria-label={`Edit ${draft.description || 'draft'}`}
               title="Edit draft details"
-              whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
-              style={{
-                padding: '5px 10px',
-                borderRadius: 'var(--radius-sm, 8px)',
-                background: 'var(--bg-surface-elevated)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-secondary)',
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-              }}
             >
               ✏️ Edit
-            </motion.button>
+            </Button>
 
-            <motion.button
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={() => onConfirm(draft)}
               aria-label={`Confirm and save ${draft.description || 'draft'}`}
               title="Confirm draft"
-              whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
               style={{
-                padding: '5px 12px',
-                borderRadius: 'var(--radius-sm, 8px)',
                 background: 'var(--color-positive-bg)',
-                border: '1px solid var(--color-positive-border)',
                 color: 'var(--color-positive)',
+                borderColor: 'var(--color-positive-border)',
                 fontWeight: 600,
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
               }}
             >
               ✓ Confirm
-            </motion.button>
+            </Button>
 
             {onDismiss && (
               <button
                 type="button"
                 onClick={() => onDismiss(draft)}
                 aria-label="Dismiss draft"
-                title="Dismiss"
+                title="Dismiss draft"
+                className="btn-icon-round"
                 style={{
-                  padding: '5px 8px',
-                  borderRadius: 'var(--radius-sm, 8px)',
-                  background: 'transparent',
+                  width: '28px',
+                  height: '28px',
+                  minHeight: '28px',
                   border: 'none',
-                  color: 'var(--text-muted)',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
                 }}
               >
                 ✕
@@ -238,7 +223,7 @@ const ReviewCard = ({
             )}
           </div>
         </div>
-      </motion.div>
+      </Motion.div>
     </div>
   );
 };

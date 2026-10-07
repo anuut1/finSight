@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import api from '../api/axios';
+import Button from './Button.jsx';
 
 const CATEGORIES = [
   'Food & Dining',
@@ -354,31 +355,31 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
             marginTop: '0.75rem',
           }}
         >
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleUseSampleReceipt}
             style={{
-              background: 'rgba(82, 85, 119, 0.1)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-full)',
-              padding: '3px 12px',
+              padding: '0 12px',
+              height: '32px',
               fontSize: '0.74rem',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
             }}
           >
             ⚡ Try with Sample Receipt
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
-            className="btn-primary"
+            variant="primary"
+            size="sm"
             onClick={handleScanReceipt}
             disabled={scanning || !file}
+            loading={scanning}
             style={{ padding: '6px 20px', fontSize: '0.82rem' }}
           >
-            {scanning ? 'Analyzing with Textract...' : '🔍 Scan Receipt'}
-          </button>
+            🔍 Scan Receipt
+          </Button>
         </div>
       )}
 
@@ -564,18 +565,20 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
               borderTop: '1px solid var(--divider-color)',
             }}
           >
-            <button
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               onClick={handleDiscard}
               disabled={saving}
               style={{ fontSize: '0.8rem', padding: '6px 14px' }}
             >
               Discard
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               onClick={() => handleConfirmAndSave(true)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
               style={{
@@ -586,16 +589,18 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
               }}
             >
               💾 Save as Draft
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-primary"
+              variant="primary"
+              size="sm"
               onClick={() => handleConfirmAndSave(false)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
+              loading={saving}
               style={{ fontSize: '0.82rem', padding: '7px 22px', fontWeight: 700 }}
             >
-              {saving ? 'Saving...' : '✓ Confirm & Save'}
-            </button>
+              ✓ Confirm & Save
+            </Button>
           </div>
         </div>
       )}

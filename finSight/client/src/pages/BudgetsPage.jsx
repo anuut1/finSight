@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Card from '../components/Card.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import Modal from '../components/Modal.jsx';
+import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 
 const BudgetsPage = () => {
@@ -87,9 +88,9 @@ const BudgetsPage = () => {
             Allocate monthly spending caps per category and track limits in real time.
           </p>
         </div>
-        <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
+        <Button type="button" variant="primary" onClick={() => setModalOpen(true)}>
           + Add budget
-        </button>
+        </Button>
       </div>
 
       {error && (
@@ -155,22 +156,14 @@ const BudgetsPage = () => {
                       Cap: ₹{Number(b.limit).toLocaleString('en-IN')}
                     </div>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="danger"
+                    size="sm"
                     onClick={() => handleDelete(b._id)}
-                    style={{
-                      border: '1px solid rgba(244, 63, 94, 0.25)',
-                      background: 'transparent',
-                      color: 'var(--color-negative)',
-                      cursor: 'pointer',
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      padding: '3px 8px',
-                      borderRadius: 'var(--radius-sm, 8px)',
-                    }}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
 
                 <div
@@ -258,9 +251,9 @@ const BudgetsPage = () => {
               placeholder="e.g. 5000"
             />
           </div>
-          <button className="btn-primary" type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save budget'}
-          </button>
+          <Button variant="primary" type="submit" loading={saving} fullWidth>
+            Save budget
+          </Button>
         </form>
       </Modal>
     </>

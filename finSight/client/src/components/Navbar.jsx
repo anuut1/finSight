@@ -1,5 +1,6 @@
 import useAuth from '../hooks/useAuth';
 import ThemeToggle from './ThemeToggle.jsx';
+import Button from './Button.jsx';
 
 /**
  * Quiet Ledger Top Bar
@@ -27,22 +28,14 @@ const Navbar = () => {
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               {user.name || user.email}
             </span>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={logout}
-              className="btn-secondary"
-              style={{
-                padding: '4px 12px',
-                fontSize: '0.78rem',
-                borderRadius: 'var(--radius-pill, 999px)',
-                background: 'transparent',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-              }}
             >
               Sign out
-            </button>
+            </Button>
           </div>
         )}
       </div>

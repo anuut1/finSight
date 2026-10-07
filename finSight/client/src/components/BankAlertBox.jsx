@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../api/axios';
+import Button from './Button.jsx';
 
 const CATEGORIES = [
   'Food & Dining',
@@ -177,41 +178,41 @@ const BankAlertBox = ({ onTransactionCreated, compact = false }) => {
           Try:
         </span>
         {SAMPLE_ALERTS.map((sample, idx) => (
-          <button
+          <Button
             key={idx}
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => {
               setText(sample.text);
               handleParse(sample.text);
             }}
             style={{
-              background: 'rgba(82, 85, 119, 0.08)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-full)',
-              padding: '2px 9px',
               fontSize: '0.72rem',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
+              padding: '0 10px',
+              height: '28px',
+              minHeight: '28px',
             }}
           >
             {sample.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Parse Trigger Button */}
       {!draft && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-          <button
+          <Button
             type="button"
-            className="btn-primary"
+            variant="primary"
+            size="sm"
             onClick={() => handleParse()}
             disabled={parsing || !text.trim()}
+            loading={parsing}
             style={{ padding: '6px 18px', fontSize: '0.82rem' }}
           >
-            {parsing ? 'Parsing Alert...' : '⚡ Parse SMS into Draft'}
-          </button>
+            ⚡ Parse SMS into Draft
+          </Button>
         </div>
       )}
 
@@ -398,18 +399,20 @@ const BankAlertBox = ({ onTransactionCreated, compact = false }) => {
               borderTop: '1px solid var(--divider-color)',
             }}
           >
-            <button
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               onClick={handleDiscard}
               disabled={saving}
               style={{ fontSize: '0.8rem', padding: '6px 14px' }}
             >
               Discard
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               onClick={() => handleConfirmAndSave(true)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
               style={{
@@ -420,16 +423,18 @@ const BankAlertBox = ({ onTransactionCreated, compact = false }) => {
               }}
             >
               💾 Save as Draft
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-primary"
+              variant="primary"
+              size="sm"
               onClick={() => handleConfirmAndSave(false)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
+              loading={saving}
               style={{ fontSize: '0.82rem', padding: '7px 20px', fontWeight: 700 }}
             >
-              {saving ? 'Saving...' : '✓ Confirm & Save'}
-            </button>
+              ✓ Confirm & Save
+            </Button>
           </div>
         </div>
       )}

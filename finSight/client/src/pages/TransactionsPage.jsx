@@ -5,6 +5,7 @@ import TransactionForm from '../components/TransactionForm.jsx';
 import VoiceExpenseRecorder from '../components/VoiceExpenseRecorder.jsx';
 import ReceiptScannerModal from '../components/ReceiptScannerModal.jsx';
 import UnconfirmedDraftsDrawer from '../components/UnconfirmedDraftsDrawer.jsx';
+import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 
 const TransactionsPage = () => {
@@ -153,29 +154,27 @@ const TransactionsPage = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
+          <Button
             type="button"
-            className="btn-secondary"
+            variant="secondary"
             onClick={() => setReceiptModalOpen(true)}
-            style={{ fontSize: '0.85rem' }}
           >
             🧾 Scan receipt
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="btn-secondary"
+            variant="secondary"
             onClick={() => openNewModal('voice')}
-            style={{ fontSize: '0.85rem' }}
           >
             🎙️ Record voice
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="btn-primary"
+            variant="primary"
             onClick={() => openNewModal('manual')}
           >
             + Add transaction
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -220,14 +219,13 @@ const TransactionsPage = () => {
             style={{ flex: '1 1 140px' }}
             aria-label="End date"
           />
-          <button
+          <Button
             type="button"
-            className="btn-primary"
-            style={{ flex: '0 0 auto' }}
+            variant="primary"
             onClick={applyFilters}
           >
             Filter
-          </button>
+          </Button>
         </div>
       </Card>
 
@@ -347,39 +345,23 @@ const TransactionsPage = () => {
                       </span>
                     </td>
                     <td style={{ padding: '0.65rem 0', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => openEditModal(t)}
-                        style={{
-                          border: '1px solid var(--border-color)',
-                          background: 'var(--bg-surface)',
-                          color: 'var(--text-primary)',
-                          cursor: 'pointer',
-                          marginRight: '0.4rem',
-                          fontSize: '0.78rem',
-                          fontWeight: 500,
-                          padding: '4px 12px',
-                          borderRadius: '999px',
-                        }}
+                        style={{ marginRight: '0.4rem' }}
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleDelete(t._id)}
-                        style={{
-                          border: '1px solid rgba(180, 83, 9, 0.3)',
-                          background: 'transparent',
-                          color: 'var(--color-warning)',
-                          cursor: 'pointer',
-                          fontSize: '0.78rem',
-                          fontWeight: 500,
-                          padding: '4px 12px',
-                          borderRadius: '999px',
-                        }}
                       >
                         Delete
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -403,26 +385,26 @@ const TransactionsPage = () => {
             Page {pagination.page} of {pagination.pages || 1}
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               disabled={pagination.page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
             >
               Previous
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               disabled={pagination.page >= (pagination.pages || 1)}
               onClick={() =>
                 setPage((p) => (pagination.pages ? Math.min(pagination.pages, p + 1) : p + 1))
               }
-              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       </Card>
@@ -441,22 +423,22 @@ const TransactionsPage = () => {
               flexWrap: 'wrap',
             }}
           >
-            <button
+            <Button
               type="button"
-              className={modalTab === 'manual' ? 'btn-primary' : 'btn-secondary'}
-              style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+              variant={modalTab === 'manual' ? 'primary' : 'secondary'}
+              size="sm"
               onClick={() => setModalTab('manual')}
             >
               Manual entry
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={modalTab === 'voice' ? 'btn-primary' : 'btn-secondary'}
-              style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+              variant={modalTab === 'voice' ? 'primary' : 'secondary'}
+              size="sm"
               onClick={() => setModalTab('voice')}
             >
               🎙️ Record voice
-            </button>
+            </Button>
           </div>
         )}
 
@@ -525,53 +507,47 @@ const TransactionsPage = () => {
           </span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => openEditModal(recentlyAddedTx)}
               style={{
                 background: '#FFFFFF',
                 color: 'var(--color-ink, #14151A)',
-                border: 'none',
-                padding: '5px 14px',
-                borderRadius: '999px',
+                borderColor: '#FFFFFF',
                 fontWeight: 600,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
               }}
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
+              size="sm"
               onClick={async () => {
                 await handleDelete(recentlyAddedTx._id);
                 setRecentlyAddedTx(null);
               }}
               style={{
-                background: 'transparent',
                 color: '#FCA5A5',
-                border: '1px solid rgba(252, 165, 165, 0.4)',
-                padding: '4px 10px',
-                borderRadius: '999px',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
+                borderColor: 'rgba(252, 165, 165, 0.4)',
               }}
             >
               Undo / Delete
-            </button>
+            </Button>
             <button
               type="button"
               onClick={() => setRecentlyAddedTx(null)}
               aria-label="Dismiss banner"
+              title="Dismiss banner"
+              className="btn-icon-round"
               style={{
-                background: 'transparent',
-                border: 'none',
+                width: '28px',
+                height: '28px',
+                minHeight: '28px',
                 color: '#9CA3AF',
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-                padding: '0 4px',
-                display: 'flex',
-                alignItems: 'center',
+                borderColor: 'transparent',
               }}
             >
               ✕

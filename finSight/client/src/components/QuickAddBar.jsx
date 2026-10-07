@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import Button from './Button.jsx';
 
 /**
  * QuickAddBar
@@ -15,7 +15,6 @@ const QuickAddBar = ({
   style = {},
 }) => {
   const [value, setValue] = useState('');
-  const prefersReducedMotion = useReducedMotion();
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -40,11 +39,8 @@ const QuickAddBar = ({
         ...style,
       }}
     >
-      <motion.form
+      <form
         onSubmit={handleSubmit}
-        initial={prefersReducedMotion ? { opacity: 1 } : { y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -87,13 +83,11 @@ const QuickAddBar = ({
         />
 
         {/* Mic action */}
-        <motion.button
+        <button
           type="button"
           onClick={onVoiceClick}
           aria-label="Speak transaction with voice"
           title="Speak transaction"
-          whileHover={prefersReducedMotion ? {} : { scale: 1.08 }}
-          whileTap={prefersReducedMotion ? {} : { scale: 0.94 }}
           className="btn-icon-round"
         >
           <svg
@@ -112,16 +106,14 @@ const QuickAddBar = ({
             <line x1="12" y1="19" x2="12" y2="23" />
             <line x1="8" y1="23" x2="16" y2="23" />
           </svg>
-        </motion.button>
+        </button>
 
         {/* Scan receipt action */}
-        <motion.button
+        <button
           type="button"
           onClick={onScanClick}
           aria-label="Scan receipt image"
           title="Scan receipt"
-          whileHover={prefersReducedMotion ? {} : { scale: 1.08 }}
-          whileTap={prefersReducedMotion ? {} : { scale: 0.94 }}
           className="btn-icon-round"
         >
           <svg
@@ -138,23 +130,19 @@ const QuickAddBar = ({
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
             <circle cx="12" cy="13" r="4" />
           </svg>
-        </motion.button>
+        </button>
 
         {/* Submit arrow button (shows when text is entered) */}
         {value.trim() && (
-          <motion.button
+          <Button
             type="submit"
+            size="sm"
             aria-label="Submit quick add"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            whileHover={prefersReducedMotion ? {} : { scale: 1.05 }}
-            whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
-            className="btn btn-primary btn-sm"
           >
             Add &rarr;
-          </motion.button>
+          </Button>
         )}
-      </motion.form>
+      </form>
     </div>
   );
 };

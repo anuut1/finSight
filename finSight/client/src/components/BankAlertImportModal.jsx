@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../api/axios';
 import Modal from './Modal';
+import Button from './Button';
 
 const CATEGORIES = [
   'Food & Dining',
@@ -153,40 +154,41 @@ const BankAlertImportModal = ({ isOpen, onClose, onTransactionCreated }) => {
             Try sample:
           </span>
           {SAMPLE_ALERTS.map((sample, idx) => (
-            <button
+            <Button
               key={idx}
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 setText(sample.text);
                 handleParse(sample.text);
               }}
               style={{
-                background: 'rgba(82, 85, 119, 0.12)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-full)',
-                padding: '2px 9px',
                 fontSize: '0.72rem',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
+                padding: '0 10px',
+                height: '28px',
+                minHeight: '28px',
               }}
             >
               {sample.label}
-            </button>
+            </Button>
           ))}
         </div>
 
         {/* Parse Button */}
         {!draft && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-            <button
+            <Button
               type="button"
-              className="btn-primary"
+              variant="primary"
+              size="sm"
               onClick={() => handleParse()}
               disabled={parsing || !text.trim()}
+              loading={parsing}
               style={{ padding: '7px 18px', fontSize: '0.82rem' }}
             >
-              {parsing ? 'Parsing alert...' : '⚡ Parse SMS / Alert'}
-            </button>
+              ⚡ Parse SMS / Alert
+            </Button>
           </div>
         )}
 
@@ -357,24 +359,27 @@ const BankAlertImportModal = ({ isOpen, onClose, onTransactionCreated }) => {
 
             {/* Confirmation actions */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem', paddingTop: '0.65rem', borderTop: '1px solid var(--divider-color)' }}>
-              <button
+              <Button
                 type="button"
-                className="btn-secondary"
+                variant="secondary"
+                size="sm"
                 onClick={handleDiscard}
                 disabled={saving}
                 style={{ fontSize: '0.78rem', padding: '6px 14px' }}
               >
                 Discard
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="btn-primary"
+                variant="primary"
+                size="sm"
                 onClick={handleConfirmAndSave}
                 disabled={saving || !draft.amount || Number(draft.amount) <= 0}
+                loading={saving}
                 style={{ fontSize: '0.78rem', padding: '6px 18px', fontWeight: 700 }}
               >
-                {saving ? 'Saving...' : '✓ Confirm & Save Transaction'}
-              </button>
+                ✓ Confirm & Save Transaction
+              </Button>
             </div>
           </div>
         )}

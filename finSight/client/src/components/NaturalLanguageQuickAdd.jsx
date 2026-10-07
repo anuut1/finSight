@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
+import Button from './Button.jsx';
 
 const CATEGORIES = [
   'Food & Dining',
@@ -372,25 +373,20 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
           {/* Microphone button inside the input */}
           <button
             type="button"
+            className="btn-icon-round"
             onClick={toggleListening}
+            aria-label={isListening ? 'Stop listening' : 'Speak via microphone'}
             title={isListening ? 'Click to stop listening' : 'Speak via microphone'}
             style={{
               position: 'absolute',
               right: '8px',
               width: '34px',
               height: '34px',
-              borderRadius: '50%',
-              border: 'none',
+              border: isListening ? '2px solid var(--accent-danger)' : undefined,
               background: isListening
                 ? 'var(--accent-danger, #ef4444)'
                 : 'var(--bg-tertiary, rgba(82, 85, 119, 0.2))',
               color: isListening ? '#ffffff' : 'var(--text-primary)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1rem',
-              transition: 'all 0.2s ease',
               boxShadow: isListening ? '0 0 10px rgba(239, 68, 68, 0.5)' : 'none',
             }}
           >
@@ -398,15 +394,16 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
           </button>
         </div>
 
-        <button
+        <Button
           type="button"
-          className="btn-primary"
+          variant="primary"
           onClick={() => handleParse()}
           disabled={parsing || !input.trim()}
+          loading={parsing}
           style={{ minWidth: '95px' }}
         >
-          {parsing ? 'Parsing...' : 'Analyze'}
-        </button>
+          Analyze
+        </Button>
       </div>
 
       {/* Suggested examples pills */}
@@ -416,34 +413,24 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
             Try:
           </span>
           {SAMPLE_PROMPTS.map((prompt, idx) => (
-            <button
+            <Button
               key={idx}
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 setInput(prompt);
                 handleParse(prompt);
               }}
               style={{
-                background: 'rgba(82, 85, 119, 0.08)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-full)',
-                padding: '2px 10px',
                 fontSize: '0.72rem',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--accent-primary-light)';
-                e.currentTarget.style.color = 'var(--text-primary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
+                padding: '0 10px',
+                height: '28px',
+                minHeight: '28px',
               }}
             >
               &ldquo;{prompt}&rdquo;
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -542,40 +529,24 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
                 TYPE
               </label>
               <div style={{ display: 'flex', gap: '4px' }}>
-                <button
+                <Button
                   type="button"
+                  variant={draft.type === 'expense' ? 'primary' : 'secondary'}
+                  size="sm"
                   onClick={() => handleDraftChange('type', 'expense')}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-color)',
-                    background: draft.type === 'expense' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                    color: draft.type === 'expense' ? '#ffffff' : 'var(--text-secondary)',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
+                  style={{ flex: 1 }}
                 >
                   Expense
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant={draft.type === 'income' ? 'primary' : 'secondary'}
+                  size="sm"
                   onClick={() => handleDraftChange('type', 'income')}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-color)',
-                    background: draft.type === 'income' ? 'var(--color-income)' : 'var(--bg-secondary)',
-                    color: draft.type === 'income' ? '#ffffff' : 'var(--text-secondary)',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
+                  style={{ flex: 1 }}
                 >
                   Income
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -772,18 +743,20 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
               borderTop: '1px solid var(--divider-color)',
             }}
           >
-            <button
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               onClick={handleDiscard}
               disabled={saving}
               style={{ padding: '8px 14px', fontSize: '0.82rem' }}
             >
               Discard
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="secondary"
+              size="sm"
               onClick={() => handleConfirmAndSave(true)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
               style={{
@@ -794,12 +767,14 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
               }}
             >
               💾 Save as Draft
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-primary"
+              variant="primary"
+              size="sm"
               onClick={() => handleConfirmAndSave(false)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
+              loading={saving}
               style={{
                 padding: '9px 20px',
                 fontSize: '0.85rem',
@@ -807,8 +782,8 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
                 boxShadow: 'var(--shadow-md)',
               }}
             >
-              {saving ? 'Saving...' : '✓ Confirm & Save'}
-            </button>
+              ✓ Confirm & Save
+            </Button>
           </div>
         </div>
       )}

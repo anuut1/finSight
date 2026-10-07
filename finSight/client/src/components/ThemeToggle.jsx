@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import Button from './Button.jsx';
 
 /**
  * Quiet Ledger Theme Toggle
  *
  * Defaults to light mode, toggles to dark mode via [data-theme="dark"].
- * Styled as an airy, minimal outline pill button.
+ * Uses Button component for unified styling and transitions.
  */
 const ThemeToggle = ({ className = '', style = {} }) => {
   const [theme, setTheme] = useState(() => {
@@ -27,37 +28,17 @@ const ThemeToggle = ({ className = '', style = {} }) => {
   const isDark = theme === 'dark';
 
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      size="sm"
       onClick={toggleTheme}
       aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
       title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-      className={`btn-secondary ${className}`}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '7px',
-        padding: '6px 14px',
-        borderRadius: 'var(--radius-pill, 999px)',
-        background: 'transparent',
-        border: '1px solid var(--border-color)',
-        color: 'var(--text-primary)',
-        cursor: 'pointer',
-        fontSize: '0.8rem',
-        fontWeight: 500,
-        fontFamily: 'var(--font-sans)',
-        position: 'relative',
-        overflow: 'hidden',
-        transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-        userSelect: 'none',
-        outline: 'none',
-        WebkitTapHighlightColor: 'transparent',
-        ...style,
-      }}
-    >
-      {isDark ? (
-        <>
+      className={className}
+      style={{ padding: '0 14px', gap: '7px', ...style }}
+      icon={
+        isDark ? (
           <svg
             width="14"
             height="14"
@@ -79,10 +60,7 @@ const ThemeToggle = ({ className = '', style = {} }) => {
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
           </svg>
-          <span>Light</span>
-        </>
-      ) : (
-        <>
+        ) : (
           <svg
             width="14"
             height="14"
@@ -96,10 +74,11 @@ const ThemeToggle = ({ className = '', style = {} }) => {
           >
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
-          <span>Dark</span>
-        </>
-      )}
-    </button>
+        )
+      }
+    >
+      {isDark ? 'Light' : 'Dark'}
+    </Button>
   );
 };
 

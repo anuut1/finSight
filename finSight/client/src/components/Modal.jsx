@@ -83,28 +83,8 @@ const Modal = ({ title, isOpen, onClose, children }) => {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              fontSize: '1.25rem',
-              lineHeight: 1,
-              padding: '6px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'color 150ms ease, background 150ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--text-primary)';
-              e.currentTarget.style.background = 'var(--bg-surface-elevated, #F4F4F2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--text-muted)';
-              e.currentTarget.style.background = 'transparent';
-            }}
+            title="Close"
+            className="btn-icon-round modal-close"
           >
             ✕
           </button>

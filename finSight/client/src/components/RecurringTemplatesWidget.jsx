@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import GlassCard from './GlassCard';
 import Modal from './Modal';
+import Button from './Button';
 
 const CATEGORIES = [
   'Bills & Utilities',
@@ -158,21 +159,21 @@ const RecurringTemplatesWidget = ({ onTransactionLogged }) => {
           <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
             Upcoming Payments & Subscriptions
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setModalOpen(true)}
             style={{
-              background: 'transparent',
-              border: 'none',
               color: 'var(--accent-primary-light)',
               fontSize: '0.78rem',
               fontWeight: 600,
-              cursor: 'pointer',
-              padding: '2px 6px',
+              padding: '2px 8px',
+              minHeight: '28px',
             }}
           >
             ⚙️ Manage
-          </button>
+          </Button>
         </div>
 
         <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
@@ -207,23 +208,26 @@ const RecurringTemplatesWidget = ({ onTransactionLogged }) => {
               Track rent, Netflix, WiFi, electricity, or SIPs with one-tap payment logging.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button
+              <Button
                 type="button"
-                className="btn-primary"
+                variant="primary"
+                size="sm"
                 onClick={handleInitPresets}
                 disabled={submitting}
+                loading={submitting}
                 style={{ fontSize: '0.75rem', padding: '5px 12px' }}
               >
                 ⚡ Load Standard Presets
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="btn-secondary"
+                variant="secondary"
+                size="sm"
                 onClick={() => setModalOpen(true)}
                 style={{ fontSize: '0.75rem', padding: '5px 12px' }}
               >
                 + Custom
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -291,25 +295,27 @@ const RecurringTemplatesWidget = ({ onTransactionLogged }) => {
                     </div>
 
                     {/* One-tap Log Payment Button */}
-                    <button
+                    <Button
                       type="button"
+                      size="sm"
+                      variant="secondary"
                       title="Click to log this payment now"
+                      aria-label={`Log payment for ${item.name}`}
                       onClick={() => handleLogPayment(item)}
                       disabled={isLogging || item.status === 'paused'}
+                      loading={isLogging}
                       style={{
-                        padding: '4px 8px',
-                        borderRadius: 'var(--radius-sm)',
+                        padding: '4px 10px',
                         border: '1px solid rgba(16, 185, 129, 0.4)',
                         background: 'rgba(16, 185, 129, 0.12)',
                         color: 'var(--accent-success)',
-                        fontSize: '0.7rem',
+                        fontSize: '0.72rem',
                         fontWeight: 700,
-                        cursor: 'pointer',
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {isLogging ? '...' : '✓ Log'}
-                    </button>
+                      ✓ Log
+                    </Button>
                   </div>
                 </div>
               );
@@ -438,9 +444,16 @@ const RecurringTemplatesWidget = ({ onTransactionLogged }) => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="submit" className="btn-primary" disabled={submitting} style={{ fontSize: '0.78rem', padding: '5px 14px' }}>
-                {submitting ? 'Saving...' : 'Save Template'}
-              </button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={submitting}
+                loading={submitting}
+                style={{ fontSize: '0.78rem', padding: '5px 14px' }}
+              >
+                Save Template
+              </Button>
             </div>
           </form>
 
@@ -482,53 +495,53 @@ const RecurringTemplatesWidget = ({ onTransactionLogged }) => {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
+                        variant="secondary"
                         onClick={() => handleLogPayment(t)}
                         disabled={loggingId === t._id || t.status === 'paused'}
+                        loading={loggingId === t._id}
+                        aria-label={`Log payment for ${t.name}`}
                         style={{
                           padding: '3px 8px',
-                          borderRadius: 'var(--radius-sm)',
                           border: '1px solid rgba(16, 185, 129, 0.4)',
                           background: 'rgba(16, 185, 129, 0.15)',
                           color: 'var(--accent-success)',
                           fontSize: '0.7rem',
                           fontWeight: 600,
-                          cursor: 'pointer',
                         }}
                       >
                         ✓ Log
-                      </button>
+                      </Button>
 
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
+                        variant="secondary"
                         onClick={() => handleToggleStatus(t)}
+                        aria-label={`${t.status === 'active' ? 'Pause' : 'Resume'} ${t.name}`}
                         style={{
                           padding: '3px 8px',
-                          borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--border-color)',
-                          background: 'transparent',
                           color: 'var(--text-secondary)',
                           fontSize: '0.7rem',
-                          cursor: 'pointer',
                         }}
                       >
                         {t.status === 'active' ? 'Pause' : 'Resume'}
-                      </button>
+                      </Button>
 
                       <button
                         type="button"
+                        className="btn-icon-round"
                         onClick={() => handleDeleteTemplate(t._id)}
+                        aria-label={`Delete ${t.name}`}
+                        title="Delete"
                         style={{
-                          padding: '3px 6px',
-                          borderRadius: 'var(--radius-sm)',
-                          border: 'none',
-                          background: 'transparent',
+                          width: '28px',
+                          height: '28px',
                           color: 'var(--accent-danger)',
                           fontSize: '0.8rem',
-                          cursor: 'pointer',
                         }}
-                        title="Delete"
                       >
                         ✕
                       </button>

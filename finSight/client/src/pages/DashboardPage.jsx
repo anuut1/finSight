@@ -10,6 +10,7 @@ import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import VoiceExpenseRecorder from '../components/VoiceExpenseRecorder.jsx';
 import ReceiptScannerBox from '../components/ReceiptScannerBox.jsx';
+import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 
 /**
@@ -197,30 +198,30 @@ const DashboardPage = () => {
             flexWrap: 'wrap',
           }}
         >
-          <button
+          <Button
             type="button"
-            className={modalTab === 'manual' ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+            variant={modalTab === 'manual' ? 'primary' : 'secondary'}
+            size="sm"
             onClick={() => setModalTab('manual')}
           >
             Manual entry
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={modalTab === 'voice' ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+            variant={modalTab === 'voice' ? 'primary' : 'secondary'}
+            size="sm"
             onClick={() => setModalTab('voice')}
           >
             🎙️ Record voice
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={modalTab === 'receipt' ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '0.84rem', padding: '7px 16px', borderRadius: '999px' }}
+            variant={modalTab === 'receipt' ? 'primary' : 'secondary'}
+            size="sm"
             onClick={() => setModalTab('receipt')}
           >
             🧾 Scan receipt
-          </button>
+          </Button>
         </div>
 
         {modalTab === 'manual' && (
@@ -284,8 +285,10 @@ const DashboardPage = () => {
           </span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 setEditingTx(recentlyAddedTx);
                 setEditModalOpen(true);
@@ -293,44 +296,36 @@ const DashboardPage = () => {
               style={{
                 background: '#FFFFFF',
                 color: 'var(--color-ink, #14151A)',
-                border: 'none',
-                padding: '5px 14px',
-                borderRadius: '999px',
+                borderColor: '#FFFFFF',
                 fontWeight: 600,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
               }}
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
+              size="sm"
               onClick={handleDeleteRecentTx}
               style={{
-                background: 'transparent',
                 color: '#FCA5A5',
-                border: '1px solid rgba(252, 165, 165, 0.4)',
-                padding: '4px 10px',
-                borderRadius: '999px',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
+                borderColor: 'rgba(252, 165, 165, 0.4)',
               }}
             >
               Undo / Delete
-            </button>
+            </Button>
             <button
               type="button"
               onClick={() => setRecentlyAddedTx(null)}
               aria-label="Dismiss banner"
+              title="Dismiss banner"
+              className="btn-icon-round"
               style={{
-                background: 'transparent',
-                border: 'none',
+                width: '28px',
+                height: '28px',
+                minHeight: '28px',
                 color: '#9CA3AF',
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-                padding: '0 4px',
-                display: 'flex',
-                alignItems: 'center',
+                borderColor: 'transparent',
               }}
             >
               ✕

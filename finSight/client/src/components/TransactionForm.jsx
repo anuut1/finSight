@@ -172,40 +172,32 @@ const TransactionForm = ({ initialValues, onSubmit, submitting = false, onCancel
             border: '1px solid var(--border-color)',
           }}
         >
-          <button
+          <Button
             type="button"
+            variant={type === 'expense' ? 'primary' : 'ghost'}
+            size="sm"
             onClick={() => handleTypeChange('expense')}
             style={{
-              padding: '8px 16px',
+              width: '100%',
               borderRadius: '999px',
-              border: 'none',
-              background: type === 'expense' ? 'var(--color-ink)' : 'transparent',
-              color: type === 'expense' ? '#FFFFFF' : 'var(--text-secondary)',
-              fontWeight: 500,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              transition: 'background 150ms ease, color 150ms ease',
+              border: type === 'expense' ? undefined : 'none',
             }}
           >
             Expense
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant={type === 'income' ? 'primary' : 'ghost'}
+            size="sm"
             onClick={() => handleTypeChange('income')}
             style={{
-              padding: '8px 16px',
+              width: '100%',
               borderRadius: '999px',
-              border: 'none',
-              background: type === 'income' ? 'var(--color-ink)' : 'transparent',
-              color: type === 'income' ? '#FFFFFF' : 'var(--text-secondary)',
-              fontWeight: 500,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              transition: 'background 150ms ease, color 150ms ease',
+              border: type === 'income' ? undefined : 'none',
             }}
           >
             Income
-          </button>
+          </Button>
         </div>
       </div>
 
