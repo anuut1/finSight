@@ -94,13 +94,16 @@ const Button = forwardRef(
       fontFamily: 'var(--font-sans)',
       fontWeight: 500,
       letterSpacing: '-0.01em',
+      position: 'relative',
+      overflow: 'hidden',
       cursor: isDisabled ? 'not-allowed' : 'pointer',
       opacity: isDisabled ? 0.45 : 1,
       width: fullWidth ? '100%' : 'auto',
-      transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast)',
+      transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
       userSelect: 'none',
       whiteSpace: 'nowrap',
       textDecoration: 'none',
+      WebkitTapHighlightColor: 'transparent',
       ...sizeStyles,
       ...getVariantStyles(),
       ...style,
@@ -118,7 +121,14 @@ const Button = forwardRef(
         {...props}
       >
         {loading ? (
-          <>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              animation: 'btnFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
             <svg
               width="16"
               height="16"
@@ -138,10 +148,22 @@ const Button = forwardRef(
               <circle cx="12" cy="12" r="10" />
             </svg>
             <span>{typeof children === 'string' ? children : 'Submitting...'}</span>
-          </>
+          </span>
         ) : (
           <>
-            {icon && <span className="btn-icon" aria-hidden="true">{icon}</span>}
+            {icon && (
+              <span
+                className="btn-icon"
+                aria-hidden="true"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+              >
+                {icon}
+              </span>
+            )}
             {children}
           </>
         )}

@@ -47,9 +47,12 @@ const ThemeToggle = ({ className = '', style = {} }) => {
         fontSize: '0.8rem',
         fontWeight: 500,
         fontFamily: 'var(--font-sans)',
-        transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast)',
+        position: 'relative',
+        overflow: 'hidden',
+        transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
         userSelect: 'none',
         outline: 'none',
+        WebkitTapHighlightColor: 'transparent',
         ...style,
       }}
     >
