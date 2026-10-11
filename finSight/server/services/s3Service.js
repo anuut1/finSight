@@ -67,9 +67,94 @@ async function generateReceiptViewUrl(key) {
   return getSignedUrl(s3Client, command, { expiresIn: 3600 });
 }
 
+/**
+ * Generate a pre-signed S3 upload URL for direct user avatar / profile photo upload.
+ *
+ * @param {string} userId - ID of the user uploading the avatar
+ * @param {string} contentType - MIME type (image/jpeg, image/png, image/webp)
+ * @returns {Promise<{ uploadUrl: string, key: string, bucket: string, expiresIn: number }>}
+ */
+async function generateAvatarUploadUrl(userId, contentType = 'image/jpeg') {
+  const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+  const key = `avatars/${userId}/avatar.${ext}`;
+
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  const expiresIn = 900;
+  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn });
+
+  return {
+    uploadUrl,
+    key,
+    bucket: bucketName,
+    expiresIn,
+  };
+}
+
+/**
+ * Generate a pre-signed S3 download/view URL for an avatar.
+ * Valid for 24 hours.
+ */
+async function generateAvatarViewUrl(key) {
+  if (!key) return null;
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+  });
+  return getSignedUrl(s3Client, command, { expiresIn: 86400 });
+}
+
+/**
+ * Persist authentication audit events (login/registration) directly to AWS S3.
+ * Stored under audit-logs/YYYY-MM/userId-timestamp.json
+ *
+ * @param {object} param0
+ * @param {'REGISTER'|'LOGIN'} param0.event
+ * @param {string} param0.userId
+ * @param {string} param0.email
+ * @param {string} [param0.ip]
+ * @param {string} [param0.userAgent]
+ */
+async function recordAuthAuditLogToS3({ event, userId, email, ip, userAgent }) {
+  try {
+    const now = new Date();
+    const yearMonth = now.toISOString().slice(0, 7);
+    const key = `audit-logs/${yearMonth}/${userId}-${Date.now()}.json`;
+
+    const payload = {
+      event,
+      userId: userId?.toString(),
+      email,
+      timestamp: now.toISOString(),
+      ip: ip || 'unknown',
+      userAgent: userAgent || 'unknown',
+    };
+
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: JSON.stringify(payload, null, 2),
+      ContentType: 'application/json',
+    });
+
+    await s3Client.send(command);
+    return { success: true, key };
+  } catch (err) {
+    console.warn(`[AWS S3] Could not record auth audit log for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   s3Client,
   bucketName,
   generateReceiptUploadUrl,
   generateReceiptViewUrl,
+  generateAvatarUploadUrl,
+  generateAvatarViewUrl,
+  recordAuthAuditLogToS3,
 };

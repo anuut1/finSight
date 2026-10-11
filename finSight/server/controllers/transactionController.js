@@ -68,6 +68,8 @@ exports.createTransaction = async (req, res) => {
       splitGroupId,
       status = 'confirmed',
       isDraft = false,
+      receiptS3Key = '',
+      receiptUrl = '',
       metadata = {},
     } = req.body;
 
@@ -111,6 +113,8 @@ exports.createTransaction = async (req, res) => {
       currency,
       splitGroupId: finalSplitGroupId,
       status: finalStatus,
+      receiptS3Key,
+      receiptUrl,
       metadata,
     });
 

@@ -15,6 +15,8 @@ const transactionSchema = new mongoose.Schema(
     splitExpenseId: { type: mongoose.Schema.Types.ObjectId },
     currency: { type: String, default: 'INR' },
     status: { type: String, enum: ['confirmed', 'draft'], default: 'confirmed' },
+    receiptS3Key: { type: String, default: '' },
+    receiptUrl: { type: String, default: '' },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }

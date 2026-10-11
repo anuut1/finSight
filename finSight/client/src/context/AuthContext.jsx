@@ -11,6 +11,11 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const fetchMe = async () => {
       if (!token) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      if (user) {
         setLoading(false);
         return;
       }
@@ -18,21 +23,27 @@ export const AuthProvider = ({ children }) => {
         const res = await api.get('/auth/me');
         if (res.data?.success) {
           setUser(res.data.data);
+        } else {
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('finsight_token');
         }
       } catch {
         setToken(null);
+        setUser(null);
         localStorage.removeItem('finsight_token');
       } finally {
         setLoading(false);
       }
     };
     fetchMe();
-  }, [token]);
+  }, [token, user]);
 
   const login = (authToken, userData) => {
     localStorage.setItem('finsight_token', authToken);
     setToken(authToken);
     setUser(userData);
+    setLoading(false);
   };
 
   const logout = () => {

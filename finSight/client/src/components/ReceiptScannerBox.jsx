@@ -136,8 +136,12 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
           contentType: file.type || 'image/jpeg',
         });
 
-        if (presignRes.data?.success && presignRes.data.directUpload && presignRes.data.uploadUrl) {
-          const { uploadUrl, bucket, key } = presignRes.data;
+        const payload = presignRes.data?.data || presignRes.data;
+        const uploadUrl = payload?.uploadUrl;
+        const bucket = payload?.bucket;
+        const key = payload?.key;
+
+        if (presignRes.data?.success && uploadUrl && key) {
           const uploadRes = await fetch(uploadUrl, {
             method: 'PUT',
             body: file,
@@ -184,6 +188,8 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
           lineItems: Array.isArray(scanResult.lineItems) ? scanResult.lineItems : [],
           source: scanResult.source || 'aws-textract',
           note: scanResult.note || '',
+          receiptS3Key: scanResult.s3Key || '',
+          receiptUrl: scanResult.receiptUrl || '',
         });
       } else {
         setError('Could not extract details from receipt image.');
@@ -231,6 +237,8 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
         mood: 'neutral',
         isDraft: asDraft,
         status: asDraft ? 'draft' : 'confirmed',
+        receiptS3Key: draft.receiptS3Key || '',
+        receiptUrl: draft.receiptUrl || '',
       };
 
       const res = await api.post('/transactions', payload);

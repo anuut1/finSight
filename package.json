@@ -1,0 +1,13 @@
+{
+  "name": "finsight-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FinSight - Smart Personal Finance & Bill Splitting",
+  "scripts": {
+    "dev": "npm run dev --prefix finSight",
+    "server": "npm run server --prefix finSight",
+    "client": "npm run client --prefix finSight",
+    "build": "npm run build --prefix finSight/client",
+    "start": "npm start --prefix finSight/server"
+  }
+}

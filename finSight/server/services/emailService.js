@@ -1,0 +1,125 @@
+const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
+
+const getAwsConfig = () => {
+  const region = process.env.AWS_REGION || 'ap-south-1';
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+
+  if (accessKeyId && secretAccessKey) {
+    return {
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    };
+  }
+  return { region };
+};
+
+/**
+ * Send an email using Amazon SES
+ */
+async function sendTransactionalEmailViaSes({ toEmail, subject, htmlBody, textBody }) {
+  const fromEmail = process.env.AWS_SES_FROM_EMAIL;
+  if (!fromEmail || !toEmail) {
+    return { success: false, message: 'Missing SES sender or recipient email' };
+  }
+
+  try {
+    const sesClient = new SESClient(getAwsConfig());
+    const command = new SendEmailCommand({
+      Source: fromEmail,
+      Destination: {
+        ToAddresses: [toEmail],
+      },
+      Message: {
+        Subject: {
+          Data: subject,
+          Charset: 'UTF-8',
+        },
+        Body: {
+          Html: {
+            Data: htmlBody,
+            Charset: 'UTF-8',
+          },
+          Text: {
+            Data: textBody,
+            Charset: 'UTF-8',
+          },
+        },
+      },
+    });
+
+    const response = await sesClient.send(command);
+    return { success: true, messageId: response.MessageId };
+  } catch (err) {
+    console.warn(`[AWS SES] Failed sending email to ${toEmail}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Send a welcome email to newly registered FinSight users
+ */
+async function sendWelcomeEmailViaSes({ toEmail, userName }) {
+  const appUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const subject = `Welcome to FinSight, ${userName}! 🚀`;
+  const textBody = `Hi ${userName},\n\nWelcome to FinSight! Your account has been created successfully.\n\nStart tracking expenses, scanning receipts with AWS Textract, and managing your financial goals:\n${appUrl}\n\nBest regards,\nThe FinSight Team`;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Welcome to FinSight</title>
+</head>
+<body style="background-color: #0B1120; color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; margin: 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #1E293B; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
+    <tr>
+      <td style="padding: 32px 32px 20px 32px; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); text-align: center;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700;">FinSight</h1>
+        <p style="margin: 8px 0 0 0; color: #E0E7FF; font-size: 14px;">Autonomous Financial Intelligence</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 32px;">
+        <h2 style="margin: 0 0 16px 0; color: #F8FAFC; font-size: 20px;">Welcome aboard, ${userName}! 👋</h2>
+        <p style="color: #94A3B8; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+          Your account is ready. FinSight connects directly to AWS S3 and machine learning models to help you:
+        </p>
+        <ul style="color: #CBD5E1; font-size: 14px; line-height: 1.8; margin: 0 0 24px 0; padding-left: 20px;">
+          <li>Scan and digitize physical receipts automatically into Amazon S3</li>
+          <li>Log and categorize daily expenses in real time</li>
+          <li>Receive daily end-of-day digest reminders</li>
+          <li>Split bills and track group expenses effortlessly</li>
+        </ul>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${appUrl}" style="background-color: #6366F1; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+            Open FinSight Dashboard
+          </a>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 20px 32px; background-color: #0F172A; text-align: center; font-size: 12px; color: #64748B;">
+        Sent securely via Amazon Simple Email Service (SES).
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  return sendTransactionalEmailViaSes({
+    toEmail,
+    subject,
+    htmlBody,
+    textBody,
+  });
+}
+
+module.exports = {
+  sendTransactionalEmailViaSes,
+  sendWelcomeEmailViaSes,
+};
