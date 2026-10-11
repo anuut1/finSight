@@ -4,8 +4,20 @@ const splitMemberSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, trim: true, lowercase: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    role: { type: String, enum: ['owner', 'member'], default: 'member' },
+    status: { type: String, enum: ['pending', 'active'], default: 'active' },
   },
   { _id: true }
+);
+
+const personalSyncSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    amount: { type: Number, min: 0, default: 0 },
+    transactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
+  },
+  { _id: false }
 );
 
 const splitExpenseSchema = new mongoose.Schema(
@@ -19,6 +31,8 @@ const splitExpenseSchema = new mongoose.Schema(
     syncPersonal: { type: Boolean, default: true },
     personalShareAmount: { type: Number, min: 0, default: 0 },
     personalTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    personalSync: [personalSyncSchema],
   },
   { timestamps: true }
 );
@@ -30,8 +44,32 @@ const splitSettlementSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     date: { type: Date, required: true },
     note: { type: String, trim: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
+);
+
+const splitGroupInviteSchema = new mongoose.Schema(
+  {
+    email: { type: String, trim: true, lowercase: true },
+    token: { type: String, sparse: true, index: true },
+    role: { type: String, enum: ['member'], default: 'member' },
+    invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    status: { type: String, enum: ['pending', 'accepted', 'declined', 'expired'], default: 'pending' },
+    createdAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date },
+  },
+  { _id: true }
+);
+
+const splitShareSchema = new mongoose.Schema(
+  {
+    token: { type: String, unique: true, sparse: true, index: true },
+    enabled: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date, default: null },
+  },
+  { _id: false }
 );
 
 const splitGroupSchema = new mongoose.Schema(
@@ -42,6 +80,8 @@ const splitGroupSchema = new mongoose.Schema(
     members: [splitMemberSchema],
     expenses: [splitExpenseSchema],
     settlements: [splitSettlementSchema],
+    invites: [splitGroupInviteSchema],
+    share: { type: splitShareSchema, default: () => ({ enabled: false, token: null, expiresAt: null }) },
     isTrip: { type: Boolean, default: false },
     tripStatus: { type: String, enum: ['active', 'ended'], default: 'active' },
     currency: { type: String, default: 'INR' },
