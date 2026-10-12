@@ -3,6 +3,7 @@ import Card from '../components/Card.jsx';
 import BalanceChip from '../components/BalanceChip.jsx';
 import Modal from '../components/Modal.jsx';
 import TripModeWidget from '../components/TripModeWidget.jsx';
+import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 import useAuth from '../hooks/useAuth.js';
 
@@ -228,9 +229,9 @@ const SplitsPage = () => {
             Split shared bills and sync only your share into personal budgets.
           </p>
         </div>
-        <button type="button" className="btn-primary" onClick={() => setGroupModalOpen(true)}>
+        <Button type="button" variant="primary" onClick={() => setGroupModalOpen(true)}>
           + New group
-        </button>
+        </Button>
       </div>
 
       {/* Trip Mode Banner & Settlement Tool */}
@@ -263,9 +264,9 @@ const SplitsPage = () => {
           <p className="text-muted" style={{ fontSize: '0.85rem' }}>
             Create a group for a trip, room, dinner, or project to start splitting costs.
           </p>
-          <button type="button" className="btn-primary" onClick={() => setGroupModalOpen(true)}>
+          <Button type="button" variant="primary" onClick={() => setGroupModalOpen(true)}>
             Create your first group
-          </button>
+          </Button>
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: '1rem' }}>
@@ -278,6 +279,7 @@ const SplitsPage = () => {
                 <button
                   key={group._id}
                   type="button"
+                  className="btn-group-select"
                   onClick={() => setSelectedGroupId(group._id)}
                   style={{
                     textAlign: 'left',
@@ -377,32 +379,24 @@ const SplitsPage = () => {
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button type="button" className="btn-primary" onClick={openExpenseModal}>
+                    <Button type="button" variant="primary" onClick={openExpenseModal}>
                       + Expense
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="btn-secondary"
+                      variant="secondary"
                       onClick={() => openSettlementModal()}
                     >
                       Record Settle
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="danger"
+                      size="sm"
                       onClick={handleDeleteGroup}
-                      style={{
-                        border: '1px solid rgba(244, 63, 94, 0.3)',
-                        background: 'var(--color-negative-bg)',
-                        color: 'var(--color-negative)',
-                        borderRadius: 'var(--radius-md, 12px)',
-                        padding: '6px 12px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                      }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -511,21 +505,14 @@ const SplitsPage = () => {
                               >
                                 ⚡ Settle via UPI
                               </a>
-                              <button
+                              <Button
                                 type="button"
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => openSettlementModal(debt)}
-                                style={{
-                                  padding: '5px 8px',
-                                  background: 'transparent',
-                                  border: '1px solid var(--border-strong)',
-                                  color: 'var(--text-secondary)',
-                                  borderRadius: 'var(--radius-sm, 8px)',
-                                  fontSize: '0.75rem',
-                                  cursor: 'pointer',
-                                }}
                               >
                                 Record
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         );
@@ -613,9 +600,9 @@ const SplitsPage = () => {
               style={{ borderRadius: 18, resize: 'vertical' }}
             />
           </div>
-          <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? 'Saving...' : 'Create group'}
-          </button>
+          <Button type="submit" variant="primary" loading={saving} fullWidth>
+            Create group
+          </Button>
         </form>
       </Modal>
 
@@ -708,9 +695,9 @@ const SplitsPage = () => {
             />
             Add only my share to personal expenses and budgets
           </label>
-          <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? 'Saving...' : 'Add expense'}
-          </button>
+          <Button type="submit" variant="primary" loading={saving} fullWidth>
+            Add expense
+          </Button>
         </form>
       </Modal>
 
@@ -759,9 +746,9 @@ const SplitsPage = () => {
             onChange={(e) => setSettlementForm((prev) => ({ ...prev, note: e.target.value }))}
             placeholder="Note"
           />
-          <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? 'Saving...' : 'Record settlement'}
-          </button>
+          <Button type="submit" variant="primary" loading={saving} fullWidth>
+            Record settlement
+          </Button>
         </form>
       </Modal>
     </>

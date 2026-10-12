@@ -1,5 +1,11 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const {
+  recordAuthAuditLogToS3,
+  generateAvatarUploadUrl,
+  generateAvatarViewUrl,
+} = require('../services/s3Service');
+const { sendWelcomeEmailViaSes } = require('../services/emailService');
 
 const generateToken = (userId) => {
   const secret = process.env.JWT_SECRET || 'your_secret_key_here';
@@ -14,13 +20,38 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
-    const existing = await User.findOne({ email });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(400).json({ success: false, message: 'Email already in use' });
     }
 
-    const user = new User({ name, email, password });
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    const user = new User({
+      name: name.trim(),
+      email: normalizedEmail,
+      password,
+      lastLoginAt: new Date(),
+      lastLoginIp: clientIp,
+    });
     await user.save();
+
+    // 1. Record registration event directly in AWS S3 audit logs
+    recordAuthAuditLogToS3({
+      event: 'REGISTER',
+      userId: user._id,
+      email: user.email,
+      ip: clientIp,
+      userAgent,
+    }).catch((err) => console.warn('[AWS S3 Audit] Error:', err.message));
+
+    // 2. Send welcome email via Amazon SES
+    sendWelcomeEmailViaSes({
+      toEmail: user.email,
+      userName: user.name,
+    }).catch((err) => console.warn('[AWS SES Welcome] Error:', err.message));
 
     const token = generateToken(user._id);
 
@@ -45,7 +76,8 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
@@ -55,12 +87,42 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
 
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    // Update last login info
+    try {
+      user.lastLoginAt = new Date();
+      user.lastLoginIp = clientIp;
+      await user.save();
+    } catch (saveErr) {
+      console.warn('[Login] Could not update last login info:', saveErr.message);
+    }
+
+    // Record login event directly in AWS S3
+    recordAuthAuditLogToS3({
+      event: 'LOGIN',
+      userId: user._id,
+      email: user.email,
+      ip: clientIp,
+      userAgent,
+    }).catch((err) => console.warn('[AWS S3 Audit] Error:', err.message));
+
     const token = generateToken(user._id);
+
+    const userData = user.toJSON();
+    if (user.s3AvatarKey) {
+      try {
+        userData.avatarUrl = await generateAvatarViewUrl(user.s3AvatarKey);
+      } catch (avatarErr) {
+        console.warn('[Avatar URL] Failed to generate avatar view URL:', avatarErr.message);
+      }
+    }
 
     return res.json({
       success: true,
       data: {
-        user,
+        user: userData,
         token,
       },
     });
@@ -77,10 +139,102 @@ exports.me = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    return res.json({ success: true, data: user });
+    const userData = user.toJSON();
+    if (user.s3AvatarKey) {
+      try {
+        userData.avatarUrl = await generateAvatarViewUrl(user.s3AvatarKey);
+      } catch (avatarErr) {
+        console.warn('[Avatar URL] Failed to generate avatar view URL:', avatarErr.message);
+      }
+    }
+
+    return res.json({ success: true, data: userData });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+/**
+ * Generate pre-signed S3 URL for profile picture upload
+ */
+exports.getAvatarPresignedUrl = async (req, res) => {
+  try {
+    const { contentType = 'image/jpeg' } = req.body;
+    const data = await generateAvatarUploadUrl(req.user.id, contentType);
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    console.error('Error generating avatar upload URL:', err);
+    return res.status(500).json({ success: false, message: 'Could not generate avatar upload URL' });
+  }
+};
+
+/**
+ * Update user avatar reference in database once uploaded to S3
+ */
+exports.updateAvatar = async (req, res) => {
+  try {
+    const { s3AvatarKey } = req.body;
+    if (!s3AvatarKey) {
+      return res.status(400).json({ success: false, message: 's3AvatarKey is required' });
+    }
+
+    const avatarUrl = await generateAvatarViewUrl(s3AvatarKey);
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { s3AvatarKey, avatarUrl },
+      { new: true }
+    );
+
+    return res.json({
+      success: true,
+      data: user,
+    });
+  } catch (err) {
+    console.error('Error updating user avatar:', err);
+    return res.status(500).json({ success: false, message: 'Could not update avatar' });
+  }
+};
+
+/**
+ * Reset password for user
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email and new password are required' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account found with this email address' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    const token = generateToken(user._id);
+    const userData = user.toJSON();
+
+    return res.json({
+      success: true,
+      message: 'Password updated successfully. Logging you in...',
+      data: {
+        user: userData,
+        token,
+      },
+    });
+  } catch (err) {
+    console.error('Error resetting password:', err);
+    return res.status(500).json({ success: false, message: 'Could not reset password' });
   }
 };
 

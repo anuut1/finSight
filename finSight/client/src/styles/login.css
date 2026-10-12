@@ -113,19 +113,34 @@
   justify-content: center;
   cursor: pointer;
   border-radius: var(--radius-sm, 8px);
-  transition: color var(--transition-fast), transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: 2px solid transparent;
+  outline-offset: 0px;
+  transition: color var(--btn-dur, 180ms) var(--btn-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
+              transform var(--btn-dur-fast, 120ms) var(--btn-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
+              outline-offset var(--btn-dur-fast, 120ms) var(--btn-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
 }
 
-.password-toggle-btn:hover {
-  color: var(--text-primary);
+@media (hover: hover) {
+  .password-toggle-btn:hover {
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
 }
 
 .password-toggle-btn:active {
-  transform: scale(0.9);
+  transform: translateY(0) scale(0.96);
 }
 
 .password-toggle-btn:focus-visible {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--accent-primary, #14151A);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .password-toggle-btn {
+    transition: color 0ms linear, outline-color 0ms linear;
+    transform: none !important;
+  }
 }
 
 @media (max-width: 480px) {

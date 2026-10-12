@@ -197,16 +197,15 @@ const NeedsReviewCard = ({ drafts = [], onDraftsUpdated, className = '', style =
 
                   <button
                     type="button"
+                    className="btn-icon-round"
                     onClick={() => handleDismiss(draft._id)}
                     aria-label="Dismiss draft"
                     title="Dismiss"
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      padding: '4px',
+                      width: '32px',
+                      height: '32px',
                       fontSize: '0.82rem',
+                      color: 'var(--text-muted)',
                     }}
                   >
                     ✕

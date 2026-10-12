@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Card from '../components/Card.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import Modal from '../components/Modal.jsx';
+import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 import { triggerConfetti } from '../utils/confetti.js';
 
@@ -133,9 +134,9 @@ const GoalsPage = () => {
             Track long-term savings targets and celebrate milestone progress.
           </p>
         </div>
-        <button type="button" className="btn-primary" onClick={() => setModalOpen(true)}>
+        <Button type="button" variant="primary" onClick={() => setModalOpen(true)}>
           + Add goal
-        </button>
+        </Button>
       </div>
 
       {error && (
@@ -256,30 +257,22 @@ const GoalsPage = () => {
                     borderTop: '1px solid var(--border-color)',
                   }}
                 >
-                  <button
+                  <Button
                     type="button"
-                    className="btn-primary"
-                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                    variant="primary"
+                    size="sm"
                     onClick={() => openFundModal(g)}
                   >
                     + Add funds
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="danger"
+                    size="sm"
                     onClick={() => handleDelete(g._id)}
-                    style={{
-                      border: '1px solid rgba(244, 63, 94, 0.25)',
-                      background: 'transparent',
-                      color: 'var(--color-negative)',
-                      cursor: 'pointer',
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      padding: '3px 8px',
-                      borderRadius: 'var(--radius-sm, 8px)',
-                    }}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               </Card>
             );
@@ -346,9 +339,9 @@ const GoalsPage = () => {
               className="input-glass"
             />
           </div>
-          <button className="btn-primary" type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save goal'}
-          </button>
+          <Button variant="primary" type="submit" loading={saving} fullWidth>
+            Save goal
+          </Button>
         </form>
       </Modal>
 
@@ -368,9 +361,9 @@ const GoalsPage = () => {
             className="input-glass"
             placeholder="Amount to add"
           />
-          <button className="btn-primary" type="button" onClick={handleAddFunds}>
+          <Button variant="primary" type="button" onClick={handleAddFunds} fullWidth>
             Add funds
-          </button>
+          </Button>
         </div>
       </Modal>
     </>

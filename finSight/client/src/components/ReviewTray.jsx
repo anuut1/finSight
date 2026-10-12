@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import ReviewCard from './ReviewCard.jsx';
 import Modal from './Modal.jsx';
+import Button from './Button.jsx';
 import api from '../api/axios';
 
 const CATEGORIES = [
@@ -159,22 +160,21 @@ const ReviewTray = ({
           </span>
         </div>
 
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="secondary"
           onClick={handleConfirmAll}
           style={{
-            padding: '4px 12px',
-            borderRadius: 'var(--radius-full)',
             background: 'var(--color-positive-bg)',
             border: '1px solid var(--color-positive-border)',
             color: 'var(--color-positive)',
             fontSize: '0.76rem',
             fontWeight: 600,
-            cursor: 'pointer',
           }}
         >
           ⚡ Confirm All ({drafts.length})
-        </button>
+        </Button>
       </div>
 
       {/* Cards stack with AnimatePresence */}
@@ -249,20 +249,21 @@ const ReviewTray = ({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1rem' }}>
-              <button
+              <Button
                 type="button"
-                className="btn-secondary"
+                variant="secondary"
                 onClick={() => setEditingDraft(null)}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
+                loading={saving}
                 disabled={saving}
-                className="btn-primary"
               >
-                {saving ? 'Saving...' : 'Confirm & Save'}
-              </button>
+                Confirm & Save
+              </Button>
             </div>
           </form>
         </Modal>

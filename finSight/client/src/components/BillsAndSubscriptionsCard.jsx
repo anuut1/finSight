@@ -408,15 +408,14 @@ const BillsAndSubscriptionsCard = ({ onTransactionLogged, className = '', style 
                     </Button>
                     <button
                       type="button"
+                      className="btn-icon-round"
                       onClick={() => handleOpenEdit(t)}
                       aria-label={`Edit ${t.name}`}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        padding: '4px',
+                        width: '32px',
+                        height: '32px',
                         fontSize: '0.85rem',
+                        color: 'var(--text-muted)',
                       }}
                       title="Edit"
                     >
@@ -424,15 +423,14 @@ const BillsAndSubscriptionsCard = ({ onTransactionLogged, className = '', style 
                     </button>
                     <button
                       type="button"
+                      className="btn-icon-round"
                       onClick={() => handleDelete(t._id)}
                       aria-label={`Delete ${t.name}`}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        padding: '4px',
+                        width: '32px',
+                        height: '32px',
                         fontSize: '0.85rem',
+                        color: 'var(--text-muted)',
                       }}
                       title="Delete"
                     >

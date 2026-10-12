@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
+import Button from './Button.jsx';
 
 const CATEGORIES = [
   'Food & Dining',
@@ -155,12 +156,15 @@ const UnconfirmedDraftsDrawer = ({ onDraftsUpdated }) => {
         >
           <span>{magicBanner}</span>
           <button
+            type="button"
+            className="btn-icon-round"
             onClick={() => setMagicBanner(null)}
+            aria-label="Dismiss banner"
+            title="Dismiss"
             style={{
-              background: 'none',
-              border: 'none',
+              width: '28px',
+              height: '28px',
               color: '#10B981',
-              cursor: 'pointer',
               fontWeight: 700,
             }}
           >
@@ -217,41 +221,24 @@ const UnconfirmedDraftsDrawer = ({ onDraftsUpdated }) => {
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
               onClick={handleApproveAll}
               disabled={actionLoading}
-              style={{
-                padding: '8px 16px',
-                background: 'linear-gradient(135deg, #10B981, #059669)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-              }}
+              loading={actionLoading}
             >
               ⚡ Approve All ({drafts.length})
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => setIsOpen(true)}
-              style={{
-                padding: '8px 14px',
-                background: '#1E293B',
-                color: '#E2E8F0',
-                border: '1px solid #334155',
-                borderRadius: '8px',
-                fontWeight: 500,
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}
             >
               Review Drafts &rarr;
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -308,13 +295,16 @@ const UnconfirmedDraftsDrawer = ({ onDraftsUpdated }) => {
                 </p>
               </div>
               <button
+                type="button"
+                className="btn-icon-round"
                 onClick={() => setIsOpen(false)}
+                aria-label="Close drafts modal"
+                title="Close"
                 style={{
-                  background: 'none',
-                  border: 'none',
+                  width: '32px',
+                  height: '32px',
                   color: '#94A3B8',
-                  fontSize: '20px',
-                  cursor: 'pointer',
+                  fontSize: '18px',
                 }}
               >
                 ✕
@@ -341,42 +331,27 @@ const UnconfirmedDraftsDrawer = ({ onDraftsUpdated }) => {
                 </strong>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={handleTriggerEodDigest}
                   disabled={actionLoading || drafts.length === 0}
+                  loading={actionLoading}
                   title="Simulate EventBridge -> Lambda execution and view SES digest preview"
-                  style={{
-                    padding: '6px 12px',
-                    background: '#334155',
-                    color: '#CBD5E1',
-                    border: '1px solid #475569',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    cursor: drafts.length === 0 ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
                 >
                   ✉️ Test EOD Digest
-                </button>
-                <button
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
                   onClick={handleApproveAll}
                   disabled={actionLoading || drafts.length === 0}
-                  style={{
-                    padding: '6px 14px',
-                    background: 'linear-gradient(135deg, #10B981, #059669)',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: drafts.length === 0 ? 'not-allowed' : 'pointer',
-                  }}
+                  loading={actionLoading}
                 >
                   ⚡ Approve All ({drafts.length})
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -406,8 +381,16 @@ const UnconfirmedDraftsDrawer = ({ onDraftsUpdated }) => {
                       : '📧 EOD Reminder Digest Generated (Preview Mode)'}
                   </strong>
                   <button
+                    type="button"
+                    className="btn-icon-round"
                     onClick={() => setNotificationPreview(null)}
-                    style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+                    aria-label="Close notification preview"
+                    title="Close"
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      color: '#94A3B8',
+                    }}
                   >
                     ✕
                   </button>
@@ -528,35 +511,24 @@ const UnconfirmedDraftsDrawer = ({ onDraftsUpdated }) => {
                           }}
                         />
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '4px' }}>
-                          <button
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setEditingId(null)}
-                            style={{
-                              padding: '4px 10px',
-                              background: '#334155',
-                              border: 'none',
-                              color: '#94A3B8',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                            }}
                           >
                             Cancel
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
                             onClick={() => handleApproveSingle(d._id)}
-                            style={{
-                              padding: '4px 12px',
-                              background: '#10B981',
-                              border: 'none',
-                              color: '#FFF',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                            }}
+                            disabled={actionLoading}
+                            loading={actionLoading}
                           >
                             Save & Approve
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     ) : (
@@ -626,50 +598,51 @@ const UnconfirmedDraftsDrawer = ({ onDraftsUpdated }) => {
 
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button
+                              type="button"
+                              className="btn-icon-round"
                               onClick={() => startEditing(d)}
+                              aria-label={`Edit ${d.description || 'draft'}`}
                               title="Edit draft details"
                               style={{
-                                padding: '6px 10px',
-                                background: '#0F172A',
-                                border: '1px solid #334155',
-                                color: '#94A3B8',
-                                borderRadius: '6px',
+                                width: '32px',
+                                height: '32px',
                                 fontSize: '12px',
-                                cursor: 'pointer',
+                                color: '#94A3B8',
                               }}
                             >
                               ✏️
                             </button>
                             <button
+                              type="button"
+                              className="btn-icon-round"
                               onClick={() => handleRejectSingle(d._id)}
+                              aria-label={`Dismiss ${d.description || 'draft'}`}
                               title="Dismiss / delete draft"
                               style={{
-                                padding: '6px 10px',
-                                background: '#0F172A',
-                                border: '1px solid #334155',
-                                color: '#F43F5E',
-                                borderRadius: '6px',
+                                width: '32px',
+                                height: '32px',
                                 fontSize: '12px',
-                                cursor: 'pointer',
+                                color: '#F43F5E',
                               }}
                             >
                               🗑️
                             </button>
-                            <button
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
                               onClick={() => handleApproveSingle(d._id)}
+                              disabled={actionLoading}
                               style={{
-                                padding: '6px 12px',
-                                background: 'rgba(16, 185, 129, 0.15)',
                                 border: '1px solid rgba(16, 185, 129, 0.4)',
+                                background: 'rgba(16, 185, 129, 0.15)',
                                 color: '#10B981',
-                                borderRadius: '6px',
                                 fontSize: '12px',
                                 fontWeight: 600,
-                                cursor: 'pointer',
                               }}
                             >
                               ✓ Approve
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       </div>

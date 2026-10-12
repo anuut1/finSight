@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import useAuth from '../hooks/useAuth';
@@ -19,12 +19,18 @@ import '../styles/login.css';
  * - Inline validation in warning color, no popups
  */
 const RegisterPage = () => {
-  const { login } = useAuth();
+  const { token, login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [token, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,11 +40,12 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const cleanEmail = form.email.trim().toLowerCase();
     if (!form.name.trim()) {
       setError('Please enter your name.');
       return;
     }
-    if (!form.email.trim()) {
+    if (!cleanEmail) {
       setError('Please enter your email address.');
       return;
     }
@@ -52,7 +59,7 @@ const RegisterPage = () => {
     try {
       const res = await api.post('/auth/register', {
         name: form.name.trim(),
-        email: form.email.trim(),
+        email: cleanEmail,
         password: form.password,
       });
       if (res.data?.success) {
@@ -60,7 +67,14 @@ const RegisterPage = () => {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create account. Please try again.');
+      const serverMessage = err.response?.data?.message;
+      if (serverMessage) {
+        setError(serverMessage);
+      } else if (!err.response || err.code === 'ERR_NETWORK') {
+        setError('Unable to connect to the FinSight server. Please ensure the backend is running.');
+      } else {
+        setError('Failed to create account. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -124,6 +138,7 @@ const RegisterPage = () => {
                 className="password-toggle-btn"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -148,6 +163,19 @@ const RegisterPage = () => {
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
               <span>{error}</span>
+              {error === 'Email already in use' && (
+                <Link
+                  to="/login"
+                  style={{
+                    color: 'var(--color-warning)',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    marginLeft: '4px',
+                  }}
+                >
+                  Log in or reset password?
+                </Link>
+              )}
             </div>
           )}
 

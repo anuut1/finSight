@@ -224,23 +224,19 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
         {/* Pulsing Mic Circle Button */}
         <button
           type="button"
+          className="btn-icon-round"
           onClick={isRecording ? stopRecording : startRecording}
           disabled={parsing}
           aria-label={isRecording ? 'Stop recording voice' : 'Start recording voice'}
+          title={isRecording ? 'Stop recording voice' : 'Start recording voice'}
           style={{
             width: '76px',
             height: '76px',
-            borderRadius: '50%',
             border: isRecording ? '2px solid var(--color-warning, #B45309)' : '2px solid var(--color-ink, #14151A)',
             background: isRecording ? '#FEF3C7' : 'var(--color-ink, #14151A)',
             color: isRecording ? 'var(--color-warning, #B45309)' : '#FFFFFF',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             fontSize: '1.75rem',
-            transition: 'transform 150ms ease, background 150ms ease',
-            transform: isRecording ? 'scale(1.05)' : 'scale(1)',
+            transform: isRecording ? 'scale(1.05)' : undefined,
             boxShadow: isRecording ? '0 0 0 8px rgba(180, 83, 9, 0.15)' : 'none',
           }}
         >
@@ -365,23 +361,21 @@ const VoiceExpenseRecorder = ({ onTransactionCreated, onCancel, initialText = ''
             >
               Extracted Details
             </span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setDraft(null);
                 setTranscript('');
               }}
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-muted)',
                 fontSize: '0.8rem',
-                cursor: 'pointer',
                 textDecoration: 'underline',
               }}
             >
               Record again
-            </button>
+            </Button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
