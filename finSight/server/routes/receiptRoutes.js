@@ -40,6 +40,9 @@ router.post('/analyze-s3', async (req, res) => {
 
     return res.json({
       success: true,
+      ...result,
+      receiptUrl: viewUrl,
+      s3Key: key,
       data: {
         ...result,
         receiptUrl: viewUrl,
@@ -47,8 +50,13 @@ router.post('/analyze-s3', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Error analyzing S3 receipt:', err);
-    return res.status(500).json({ success: false, message: 'Failed to analyze receipt from S3' });
+    console.error('Error analyzing S3 receipt:', err.name || 'Error', err.message);
+    const status = err.statusCode || err.status || 500;
+    return res.status(status).json({
+      success: false,
+      code: err.code || err.name || 'TEXTRACT_ERROR',
+      message: err.message || 'Failed to analyze receipt from S3',
+    });
   }
 });
 

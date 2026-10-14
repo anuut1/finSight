@@ -241,15 +241,24 @@ exports.scanReceiptEndpoint = async (req, res) => {
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({
         success: false,
-        message: 'Please upload a receipt image (JPEG, PNG, or WebP up to 5MB)',
+        message: 'Please upload a receipt file (JPEG, PNG, or PDF up to 10MB)',
       });
     }
 
     const result = await analyzeReceiptExpense(req.file.buffer, req.file.mimetype);
-    return res.json({ success: true, data: result });
+    return res.json({
+      success: true,
+      ...result,
+      data: result,
+    });
   } catch (err) {
-    console.error('Receipt scan error:', err);
-    return res.status(500).json({ success: false, message: 'Failed to process receipt' });
+    console.error('Receipt scan error:', err.name || 'Error', err.message);
+    const status = err.statusCode || err.status || 500;
+    return res.status(status).json({
+      success: false,
+      code: err.code || err.name || 'TEXTRACT_ERROR',
+      message: err.message || 'Failed to process receipt',
+    });
   }
 };
 

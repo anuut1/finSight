@@ -29,13 +29,26 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
 
-    if (!selected.type.startsWith('image/')) {
-      setError('Please select an image file (JPEG, PNG, or WebP).');
+    const mime = (selected.type || '').toLowerCase();
+    const validMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+
+    if (mime === 'image/webp') {
+      setError('WebP format is not supported by AWS Textract. Please select a JPEG, PNG, or PDF file.');
       return;
     }
 
-    if (selected.size > 5 * 1024 * 1024) {
-      setError('File size must be under 5MB.');
+    if (mime === 'image/heic' || mime === 'image/heif') {
+      setError('HEIC photos from iPhones are not supported by Textract. Please convert to JPEG or PNG.');
+      return;
+    }
+
+    if (!validMimes.includes(mime)) {
+      setError('Please select a supported file format (JPEG, PNG, or PDF).');
+      return;
+    }
+
+    if (selected.size > 10 * 1024 * 1024) {
+      setError('File size must be under 10MB (AWS Textract limit).');
       return;
     }
 
@@ -179,13 +192,28 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
       }
 
       if (scanResult) {
+        const rawItems = Array.isArray(scanResult.items)
+          ? scanResult.items.map((it) => ({
+              description: it.quantity > 1 ? `${it.quantity}x ${it.name}` : it.name,
+              name: it.name,
+              quantity: it.quantity,
+              price: it.price,
+            }))
+          : Array.isArray(scanResult.lineItems)
+          ? scanResult.lineItems
+          : [];
+
         setDraft({
           type: 'expense',
-          amount: scanResult.amount || 0,
+          amount: scanResult.total !== undefined ? scanResult.total : (scanResult.amount || 0),
           category: scanResult.category || 'Food & Dining',
           date: scanResult.date || new Date().toISOString().slice(0, 10),
-          description: scanResult.merchant || 'Receipt Expense',
-          lineItems: Array.isArray(scanResult.lineItems) ? scanResult.lineItems : [],
+          description: scanResult.vendor || scanResult.merchant || 'Receipt Expense',
+          lineItems: rawItems,
+          items: rawItems,
+          subtotal: scanResult.subtotal || 0,
+          tax: scanResult.tax || 0,
+          lowConfidenceItems: Array.isArray(scanResult.lowConfidenceItems) ? scanResult.lowConfidenceItems : [],
           source: scanResult.source || 'aws-textract',
           note: scanResult.note || '',
           receiptS3Key: scanResult.s3Key || '',
@@ -540,9 +568,34 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
                 border: '1px solid var(--border-color)',
               }}
             >
-              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
-                DETECTED LINE ITEMS
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  DETECTED LINE ITEMS ({draft.lineItems.length})
+                </span>
+                {draft.subtotal > 0 && (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Subtotal: ₹{Number(draft.subtotal).toFixed(2)} {draft.tax > 0 ? `+ Tax: ₹${Number(draft.tax).toFixed(2)}` : ''}
+                  </span>
+                )}
               </div>
+
+              {draft.lowConfidenceItems?.length > 0 && (
+                <div
+                  style={{
+                    padding: '0.4rem 0.6rem',
+                    marginBottom: '0.5rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    color: 'var(--accent-warning, #f59e0b)',
+                    fontSize: '0.72rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  ⚠️ {draft.lowConfidenceItems.length} item(s) detected with low confidence (&lt;80%). Please review names and prices before splitting.
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 {draft.lineItems.map((item, idx) => (
                   <div
