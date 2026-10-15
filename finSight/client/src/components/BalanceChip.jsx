@@ -16,7 +16,6 @@ const BalanceChip = ({
   const numeric = typeof amount === 'number' ? amount : Number(amount) || 0;
   const isOwed = direction === 'owed' || (direction === null && numeric > 0);
   const isOwes = direction === 'owes' || (direction === null && numeric < 0);
-  const isZero = numeric === 0 && direction === null;
 
   const color = isOwed
     ? 'var(--color-positive)'

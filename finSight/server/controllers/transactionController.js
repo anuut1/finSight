@@ -29,10 +29,12 @@ exports.getTransactions = async (req, res) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+    const skip = (safePage - 1) * safeLimit;
 
     const [items, total] = await Promise.all([
-      Transaction.find(query).sort({ date: -1 }).skip(skip).limit(Number(limit)),
+      Transaction.find(query).sort({ date: -1 }).skip(skip).limit(safeLimit),
       Transaction.countDocuments(query),
     ]);
 
@@ -42,9 +44,9 @@ exports.getTransactions = async (req, res) => {
         items,
         pagination: {
           total,
-          page: Number(page),
-          limit: Number(limit),
-          pages: Math.ceil(total / Number(limit)),
+          page: safePage,
+          limit: safeLimit,
+          pages: Math.ceil(total / safeLimit) || 1,
         },
       },
     });

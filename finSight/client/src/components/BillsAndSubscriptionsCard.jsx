@@ -37,7 +37,6 @@ const BillsAndSubscriptionsCard = ({ onTransactionLogged, className = '', style 
   const [data, setData] = useState({ templates: [], totalMonthlyCommitment: 0, activeCount: 0, dueSoonCount: 0 });
   const [loading, setLoading] = useState(true);
   const [detectedSubscriptions, setDetectedSubscriptions] = useState([]);
-  const [loadingDetected, setLoadingDetected] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [loggingId, setLoggingId] = useState(null);
@@ -74,8 +73,6 @@ const BillsAndSubscriptionsCard = ({ onTransactionLogged, className = '', style 
       }
     } catch (err) {
       console.warn('Could not load detected subscriptions:', err.message);
-    } finally {
-      setLoadingDetected(false);
     }
   };
 

@@ -17,6 +17,14 @@ const getAwsConfig = () => {
   return { region };
 };
 
+let cachedSesClient = null;
+const getSesClient = () => {
+  if (!cachedSesClient) {
+    cachedSesClient = new SESClient(getAwsConfig());
+  }
+  return cachedSesClient;
+};
+
 /**
  * Send an email using Amazon SES
  */
@@ -27,7 +35,7 @@ async function sendTransactionalEmailViaSes({ toEmail, subject, htmlBody, textBo
   }
 
   try {
-    const sesClient = new SESClient(getAwsConfig());
+    const sesClient = getSesClient();
     const command = new SendEmailCommand({
       Source: fromEmail,
       Destination: {

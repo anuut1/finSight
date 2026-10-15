@@ -421,6 +421,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
         amount: Number(draft.amount),
         date: draft.date,
         description: draft.description || 'Receipt Expense',
+        status: asDraft ? 'draft' : 'confirmed',
         notes: draft.note || (draft.source ? `Scanned from receipt via ${draft.source}` : ''),
         receiptUrl: draft.receiptUrl || '',
         receiptS3Key: draft.receiptS3Key || '',
@@ -508,7 +509,22 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
 
           {file ? (
             <div>
-              <span style={{ fontSize: '1.5rem' }}>📄</span>
+              {previewUrl && file.type?.startsWith('image/') ? (
+                <img
+                  src={previewUrl}
+                  alt="Receipt Preview"
+                  style={{
+                    maxHeight: '110px',
+                    maxWidth: '100%',
+                    borderRadius: 'var(--radius-sm, 6px)',
+                    marginBottom: '8px',
+                    objectFit: 'contain',
+                    border: '1px solid var(--border-color)',
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: '1.5rem' }}>📄</span>
+              )}
               <div style={{ fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>{file.name}</div>
               <div className="text-muted" style={{ fontSize: '0.72rem' }}>
                 {(file.size / 1024).toFixed(1)} KB • Click or drop another to replace

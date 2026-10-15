@@ -15,6 +15,7 @@ exports.getSummary = async (req, res) => {
 
     const tx = await Transaction.find({
       userId: req.user.id,
+      status: { $ne: 'draft' },
       date: { $gte: start, $lte: end },
     });
 
@@ -47,6 +48,7 @@ exports.getCategoryBreakdown = async (req, res) => {
         $match: {
           userId: userObjectId,
           type: 'expense',
+          status: { $ne: 'draft' },
           date: { $gte: start, $lte: end },
         },
       },
@@ -73,7 +75,7 @@ exports.getMonthlyTrend = async (req, res) => {
     const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
     const trend = await Transaction.aggregate([
-      { $match: { userId: userObjectId } },
+      { $match: { userId: userObjectId, status: { $ne: 'draft' } } },
       {
         $group: {
           _id: { year: { $year: '$date' }, month: { $month: '$date' } },
@@ -127,6 +129,7 @@ exports.getSubscriptions = async (req, res) => {
     const tx = await Transaction.find({
       userId: req.user.id,
       type: 'expense',
+      status: { $ne: 'draft' },
       date: { $gte: since },
     });
 
@@ -177,6 +180,7 @@ exports.getSpendingPattern = async (req, res) => {
         $match: {
           userId: userObjectId,
           type: 'expense',
+          status: { $ne: 'draft' },
         },
       },
       {

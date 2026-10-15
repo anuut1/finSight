@@ -21,6 +21,22 @@ const getAwsConfig = () => {
   return { region };
 };
 
+let cachedSesClient = null;
+const getSesClient = () => {
+  if (!cachedSesClient) {
+    cachedSesClient = new SESClient(getAwsConfig());
+  }
+  return cachedSesClient;
+};
+
+let cachedSnsClient = null;
+const getSnsClient = () => {
+  if (!cachedSnsClient) {
+    cachedSnsClient = new SNSClient(getAwsConfig());
+  }
+  return cachedSnsClient;
+};
+
 /**
  * Generate a signed one-tap magic link token for approving drafts without re-authenticating
  */
@@ -200,7 +216,7 @@ const sendEodReminderForUser = async (user, options = {}) => {
   // Attempt AWS SES if configured
   if (process.env.AWS_SES_FROM_EMAIL && user.email) {
     try {
-      const sesClient = new SESClient(getAwsConfig());
+      const sesClient = getSesClient();
       const sendEmailCmd = new SendEmailCommand({
         Source: process.env.AWS_SES_FROM_EMAIL,
         Destination: {
@@ -236,7 +252,7 @@ const sendEodReminderForUser = async (user, options = {}) => {
   // Attempt AWS SNS (SMS) if user has a configured phone number or topic
   if (process.env.AWS_SNS_TOPIC_ARN || options.phoneNumber) {
     try {
-      const snsClient = new SNSClient(getAwsConfig());
+      const snsClient = getSnsClient();
       const smsText = `FinSight: ${drafts.length} unconfirmed expense drafts (₹${totalAmount}). One-tap approve: ${magicApproveUrl}`;
       const publishCmd = new PublishCommand({
         Message: smsText,

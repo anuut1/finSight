@@ -119,6 +119,7 @@ const NaturalLanguageQuickAdd = ({ onTransactionCreated, compact = false, initia
       setInput(initialText);
       handleParse(initialText);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialText]);
 
   const toggleListening = () => {

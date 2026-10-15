@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useFetch from '../hooks/useFetch.js';
 import HeroSafeToSpend from '../components/HeroSafeToSpend.jsx';
 import BillsAndSubscriptionsCard from '../components/BillsAndSubscriptionsCard.jsx';
@@ -39,10 +39,22 @@ const DashboardPage = () => {
     [refreshCount]
   );
 
-  // Modal quick entry state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('manual');
   const [saving, setSaving] = useState(false);
+  const [magicBanner, setMagicBanner] = useState(null);
+
+  // Check URL query parameters for magic link approval confirmation
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('drafts_approved') === 'true') {
+      const count = params.get('count') || 'All';
+      setMagicBanner(`⚡ Success! ${count} pending expense drafts were approved via your magic link.`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setRefreshCount((c) => c + 1);
+      setTimeout(() => setMagicBanner(null), 6000);
+    }
+  }, []);
 
   // Edit transaction state
   const [editingTx, setEditingTx] = useState(null);
@@ -127,6 +139,42 @@ const DashboardPage = () => {
 
   return (
     <div className="quiet-ledger-dashboard" style={{ maxWidth: '1280px', margin: '0 auto', paddingBottom: '5rem' }}>
+      {/* Magic link confirmation banner */}
+      {magicBanner && (
+        <div
+          role="status"
+          style={{
+            marginBottom: '1.25rem',
+            padding: '0.85rem 1.25rem',
+            background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: 'var(--radius-md, 10px)',
+            color: 'var(--color-positive, #10B981)',
+            fontSize: '0.9rem',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>{magicBanner}</span>
+          <button
+            type="button"
+            onClick={() => setMagicBanner(null)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'currentColor',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              opacity: 0.75,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* 1. Hero: Safe to Spend */}
       <div style={{ marginBottom: '2rem' }}>
         <HeroSafeToSpend

@@ -40,7 +40,6 @@ export function triggerConfetti() {
     });
   }
 
-  let animationFrameId;
   const startTime = Date.now();
   const duration = 1800; // ms
 
@@ -73,8 +72,8 @@ export function triggerConfetti() {
       ctx.restore();
     }
 
-    animationFrameId = requestAnimationFrame(frame);
+    requestAnimationFrame(frame);
   }
 
-  animationFrameId = requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
