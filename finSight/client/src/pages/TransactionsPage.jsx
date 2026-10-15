@@ -5,10 +5,13 @@ import TransactionForm from '../components/TransactionForm.jsx';
 import VoiceExpenseRecorder from '../components/VoiceExpenseRecorder.jsx';
 import ReceiptScannerModal from '../components/ReceiptScannerModal.jsx';
 import UnconfirmedDraftsDrawer from '../components/UnconfirmedDraftsDrawer.jsx';
+import ExecutiveReportExport from '../components/ExecutiveReportExport.jsx';
 import Button from '../components/Button.jsx';
+import useAuth from '../hooks/useAuth.js';
 import api from '../api/axios.js';
 
 const TransactionsPage = () => {
+  const { user } = useAuth();
   const [filters, setFilters] = useState({
     type: '',
     category: '',
@@ -154,6 +157,7 @@ const TransactionsPage = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <ExecutiveReportExport transactions={data.items} user={user || {}} />
           <Button
             type="button"
             variant="secondary"

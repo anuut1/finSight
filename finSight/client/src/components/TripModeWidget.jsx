@@ -4,6 +4,7 @@ import Modal from './Modal';
 import Button from './Button';
 import TripAddExpenseModal from './TripAddExpenseModal';
 import UpiSettlementModal from './UpiSettlementModal';
+import TripCurrencyConverter from './TripCurrencyConverter';
 
 const CURRENCIES = [
   { code: 'INR', symbol: '₹', label: 'INR (₹)' },
@@ -40,6 +41,7 @@ const TripModeWidget = ({ onTripChanged }) => {
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [upiModalOpen, setUpiModalOpen] = useState(false);
   const [upiDebt, setUpiDebt] = useState(null);
+  const [fxModalOpen, setFxModalOpen] = useState(false);
 
   const fetchActiveTrip = async () => {
     try {
@@ -284,7 +286,8 @@ Calculated via FinSight`;
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <Button size="sm" variant="secondary" onClick={() => setFxModalOpen(true)}>💱 FX Rates</Button>
             <Button size="sm" onClick={() => setAddExpenseOpen(true)}>+ Add expense</Button>
             <Button size="sm" variant="secondary" onClick={() => { setEndedSummary(activeTrip); setEndModalOpen(true); }}>Settle up</Button>
             <Button size="sm" variant="danger" onClick={handleEndTrip} loading={submitting}>End trip</Button>
@@ -319,7 +322,10 @@ Calculated via FinSight`;
               </span>
             </div>
           </div>
-          <Button size="sm" onClick={() => setStartModalOpen(true)}>+ Start trip mode</Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Button size="sm" variant="secondary" onClick={() => setFxModalOpen(true)}>💱 FX Rates</Button>
+            <Button size="sm" onClick={() => setStartModalOpen(true)}>+ Start trip mode</Button>
+          </div>
         </div>
       )}
 
@@ -678,6 +684,12 @@ Calculated via FinSight`;
             console.warn('Could not refresh trip summary:', e);
           }
         }}
+      />
+
+      <TripCurrencyConverter
+        isOpen={fxModalOpen}
+        onClose={() => setFxModalOpen(false)}
+        currentTripCurrency={activeTrip?.currency || 'INR'}
       />
     </>
   );

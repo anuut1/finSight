@@ -15,6 +15,9 @@ import {
   YAxis,
 } from 'recharts';
 import Card from '../components/Card.jsx';
+import WealthProjectionSimulator from '../components/WealthProjectionSimulator.jsx';
+import ExecutiveReportExport from '../components/ExecutiveReportExport.jsx';
+import useAuth from '../hooks/useAuth.js';
 import api from '../api/axios.js';
 
 const COLORS = ['#6366F1', '#10B981', '#F43F5E', '#F59E0B', '#818CF8', '#14B8A6'];
@@ -131,12 +134,14 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const AnalyticsPage = () => {
+  const { user } = useAuth();
   const [health, setHealth] = useState(null);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [spendingPattern, setSpendingPattern] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
   const [moodSpending, setMoodSpending] = useState([]);
+  const [rawTransactions, setRawTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -151,7 +156,7 @@ const AnalyticsPage = () => {
           api.get('/analytics/category-breakdown'),
           api.get('/analytics/spending-pattern'),
           api.get('/analytics/subscriptions'),
-          api.get('/transactions?type=expense&limit=500&page=1'),
+          api.get('/transactions?limit=500&page=1'),
         ]);
 
         if (healthRes.data?.success) setHealth(healthRes.data.data);
@@ -161,14 +166,18 @@ const AnalyticsPage = () => {
         if (subRes.data?.success) setSubscriptions(subRes.data.data);
 
         if (txRes.data?.success) {
-          const byMood = (txRes.data.data.items || []).reduce(
-            (acc, transaction) => {
-              const key = transaction.mood || 'neutral';
-              acc[key] = (acc[key] || 0) + transaction.amount;
-              return acc;
-            },
-            { happy: 0, neutral: 0, stressed: 0 }
-          );
+          const items = txRes.data.data.items || [];
+          setRawTransactions(items);
+          const byMood = items
+            .filter((t) => t.type === 'expense')
+            .reduce(
+              (acc, transaction) => {
+                const key = transaction.mood || 'neutral';
+                acc[key] = (acc[key] || 0) + transaction.amount;
+                return acc;
+              },
+              { happy: 0, neutral: 0, stressed: 0 }
+            );
 
           setMoodSpending(
             Object.entries(byMood).map(([mood, total]) => ({
@@ -257,11 +266,14 @@ const AnalyticsPage = () => {
             A readable summary of health, trends, categories, moods, and recurring costs.
           </p>
         </div>
-        <div
-          className="badge badge-positive"
-          style={{ alignSelf: 'center', textTransform: 'none', letterSpacing: 0 }}
-        >
-          Includes split shares synced to personal expenses
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <ExecutiveReportExport transactions={rawTransactions} user={user || {}} />
+          <div
+            className="badge badge-positive"
+            style={{ textTransform: 'none', letterSpacing: 0 }}
+          >
+            Includes split shares synced to personal expenses
+          </div>
         </div>
       </div>
 
@@ -304,6 +316,12 @@ const AnalyticsPage = () => {
           helper={topCategory ? `${money(topCategory.total)} this month` : 'Add expenses to see this'}
         />
       </div>
+
+      {/* Interactive Wealth & Savings Simulator */}
+      <WealthProjectionSimulator
+        currentMonthlySavings={netSavings > 0 ? netSavings : 15000}
+        currentDiscretionarySpend={categoryTotal * 0.4 > 0 ? categoryTotal * 0.4 : 18000}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
         <Panel

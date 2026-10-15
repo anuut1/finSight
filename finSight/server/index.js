@@ -15,6 +15,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const splitRoutes = require('./routes/splitRoutes');
 const recurringRoutes = require('./routes/recurringRoutes');
 const receiptRoutes = require('./routes/receiptRoutes');
+const demoRoutes = require('./routes/demoRoutes');
 const { authMiddleware } = require('./middleware/authMiddleware');
 
 const helmet = require('helmet');
@@ -100,6 +101,7 @@ app.use('/api/analytics', authMiddleware, analyticsRoutes);
 app.use('/api/splits', authMiddleware, splitRoutes);
 app.use('/api/recurring', authMiddleware, recurringRoutes);
 app.use('/api/receipts', authMiddleware, receiptRoutes);
+app.use('/api/demo', authMiddleware, demoRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

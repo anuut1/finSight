@@ -10,6 +10,9 @@ import Modal from '../components/Modal.jsx';
 import TransactionForm from '../components/TransactionForm.jsx';
 import VoiceExpenseRecorder from '../components/VoiceExpenseRecorder.jsx';
 import ReceiptScannerBox from '../components/ReceiptScannerBox.jsx';
+import DemoShowcaseBanner from '../components/DemoShowcaseBanner.jsx';
+import FinancialWellnessGauge from '../components/FinancialWellnessGauge.jsx';
+import MilestoneBadgesCard from '../components/MilestoneBadgesCard.jsx';
 import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 
@@ -38,6 +41,8 @@ const DashboardPage = () => {
     {},
     [refreshCount]
   );
+  const { data: txData } = useFetch('/transactions?limit=100', {}, [refreshCount]);
+  const { data: splitsData } = useFetch('/splits/groups', {}, [refreshCount]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('manual');
@@ -139,6 +144,9 @@ const DashboardPage = () => {
 
   return (
     <div className="quiet-ledger-dashboard" style={{ maxWidth: '1280px', margin: '0 auto', paddingBottom: '5rem' }}>
+      {/* 1-Click Faculty Demo Showcase Banner */}
+      <DemoShowcaseBanner onDataReloaded={() => setRefreshCount((c) => c + 1)} />
+
       {/* Magic link confirmation banner */}
       {magicBanner && (
         <div
@@ -176,7 +184,7 @@ const DashboardPage = () => {
       )}
 
       {/* 1. Hero: Safe to Spend */}
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '1.75rem' }}>
         <HeroSafeToSpend
           income={summary?.totalIncome || 0}
           spent={summary?.totalExpense || 0}
@@ -187,6 +195,15 @@ const DashboardPage = () => {
             setModalTab('manual');
             setModalOpen(true);
           }}
+        />
+      </div>
+
+      {/* AI Financial Wellness Score Gauge */}
+      <div style={{ marginBottom: '1.75rem' }}>
+        <FinancialWellnessGauge
+          transactions={txData?.items || txData?.transactions || []}
+          budgets={budgets || []}
+          splits={splitsData || []}
         />
       </div>
 
@@ -223,6 +240,15 @@ const DashboardPage = () => {
             loading={loadingBudgets || loadingGoals}
           />
         </div>
+      </div>
+
+      {/* Financial Milestones & Gamification Badges */}
+      <div style={{ marginTop: '2rem' }}>
+        <MilestoneBadgesCard
+          transactions={txData?.items || txData?.transactions || []}
+          budgets={budgets || []}
+          splits={splitsData || []}
+        />
       </div>
 
       {/* Floating Quick Add shortcut bar */}
