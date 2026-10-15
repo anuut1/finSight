@@ -1,0 +1,10 @@
+environment             = "dev"
+aws_region              = "ap-south-1"
+github_repo             = "anuut1/finSight"
+github_branch           = "master"
+codestar_connection_arn = ""
+desired_count           = 1
+fargate_cpu             = "256"
+fargate_memory          = "512"
+custom_domain_name      = ""
+certificate_arn         = ""

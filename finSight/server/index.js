@@ -17,16 +17,29 @@ const recurringRoutes = require('./routes/recurringRoutes');
 const receiptRoutes = require('./routes/receiptRoutes');
 const { authMiddleware } = require('./middleware/authMiddleware');
 
+const helmet = require('helmet');
+const { requestLoggingMiddleware, logger } = require('./utils/logger');
+
 const app = express();
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/finsight';
+const isProd = process.env.NODE_ENV === 'production';
+
+// Security Headers via Helmet
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: isProd ? undefined : false,
+  })
+);
+
 const allowedOrigins = new Set(
   [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "https://finsight.anushree-tiwari2024.workers.dev",
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'https://finsight.anushree-tiwari2024.workers.dev',
     process.env.CLIENT_URL,
   ].filter(Boolean)
 );
@@ -34,27 +47,38 @@ const allowedOrigins = new Set(
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
   if (allowedOrigins.has(origin)) return true;
+
+  if (isProd) {
+    // In production, strictly match configured client URL, CloudFront, or official domains
+    if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return true;
+    if (/^https:\/\/[a-z0-9-]+\.cloudfront\.net$/i.test(origin)) return true;
+    if (/^https:\/\/finsight\.[a-z0-9-]+\.workers\.dev$/i.test(origin)) return true;
+    return false;
+  }
+
+  // Development origins
   if (/^http:\/\/localhost(:\d+)?$/i.test(origin)) return true;
   if (/^http:\/\/127\.0\.0\.1(:\d+)?$/i.test(origin)) return true;
-  if (/^https:\/\/[a-z0-9-]+\.workers\.dev$/i.test(origin)) return true;
-  if (/^https:\/\/[a-z0-9-]+\.pages\.dev$/i.test(origin)) return true;
-  return /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+  return false;
 };
 
 app.use(
   cors({
     origin(origin, callback) {
-      callback(null, isAllowedOrigin(origin));
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      }
     },
     credentials: true,
   })
 );
-app.use(express.json());
 
-app.use((req, res, next) => {
-  console.log(`[HTTP] ${req.method} ${req.originalUrl || req.url}`);
-  next();
-});
+// Request body size limits to prevent Denial of Service
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(requestLoggingMiddleware);
 
 // Health check
 app.get('/api/health', (req, res) => {

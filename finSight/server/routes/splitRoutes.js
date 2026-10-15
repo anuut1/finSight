@@ -9,6 +9,9 @@ const {
   startTrip,
   endTrip,
   getTripSummary,
+  getUpiDrafts,
+  createUpiDraft,
+  assignUpiDraft,
 } = require('../controllers/splitController');
 
 const router = express.Router();
@@ -23,5 +26,10 @@ router.post('/groups', createGroup);
 router.delete('/groups/:groupId', deleteGroup);
 router.post('/groups/:groupId/expenses', addExpense);
 router.post('/groups/:groupId/settlements', addSettlement);
+
+// Trip-mode UPI Drafts & Polls
+router.get('/groups/:groupId/upi-drafts', getUpiDrafts);
+router.post('/groups/:groupId/upi-drafts', createUpiDraft);
+router.post('/groups/:groupId/upi-drafts/:draftId/assign', assignUpiDraft);
 
 module.exports = router;

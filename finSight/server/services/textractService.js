@@ -1,5 +1,6 @@
 const { TextractClient, AnalyzeExpenseCommand } = require('@aws-sdk/client-textract');
 const { VALID_CATEGORIES } = require('./quickAddParser');
+const { logAwsCall } = require('../utils/logger');
 
 function inferCategoryFromMerchant(merchant = '') {
   const m = merchant.toLowerCase();
@@ -306,6 +307,7 @@ async function analyzeReceiptExpense(input, mimeType = 'image/jpeg') {
   const isBuffer = Buffer.isBuffer(input);
   const isS3Object = input && typeof input === 'object' && input.bucket && input.key;
 
+  const awsStartTime = Date.now();
   try {
     const clientConfig = {
       region: process.env.AWS_REGION || 'ap-south-1',
@@ -330,13 +332,30 @@ async function analyzeReceiptExpense(input, mimeType = 'image/jpeg') {
 
     const response = await client.send(command);
 
-    // Requirement 5: Log raw Textract response in development only
+    logAwsCall({
+      service: 'Textract',
+      operation: 'AnalyzeExpense',
+      durationMs: Date.now() - awsStartTime,
+      success: true,
+      metadata: { isS3Object: Boolean(isS3Object) },
+    });
+
+    // Log raw Textract response in development only
     if (process.env.NODE_ENV === 'development') {
       console.log('[AWS Textract Raw Response]:', JSON.stringify(response, null, 2));
     }
 
     return extractFromTextractResponse(response);
   } catch (err) {
+    logAwsCall({
+      service: 'Textract',
+      operation: 'AnalyzeExpense',
+      durationMs: Date.now() - awsStartTime,
+      success: false,
+      error: err,
+      metadata: { isS3Object: Boolean(isS3Object) },
+    });
+
     // If the error was already structured (e.g. NO_ITEMS_DETECTED), rethrow directly
     if (err.code === 'NO_ITEMS_DETECTED' || err.code === 'NO_DOCUMENT_FOUND') {
       throw err;

@@ -1,6 +1,8 @@
 const SplitGroup = require('../models/SplitGroup');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const UpiDraft = require('../models/UpiDraft');
+const { cleanAndCategorizeExpense } = require('../services/bedrockService');
 
 const roundMoney = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -485,6 +487,132 @@ exports.getTripSummary = async (req, res) => {
     return res.json({ success: true, data: getTripSummaryData(tripGroup) });
   } catch (err) {
     console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getUpiDrafts = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const drafts = await UpiDraft.find({
+      tripId: groupId,
+      status: { $in: ['pending_assignment', 'poll_created'] },
+    }).sort({ createdAt: -1 });
+
+    return res.json({ success: true, data: drafts });
+  } catch (err) {
+    console.error('Error fetching UPI drafts:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.createUpiDraft = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { rawText, amount, upiRef } = req.body;
+
+    const tripGroup = await SplitGroup.findOne({
+      _id: groupId,
+      userId: req.user.id,
+    });
+    if (!tripGroup) {
+      return res.status(404).json({ success: false, message: 'Trip group not found' });
+    }
+
+    const aiCleaned = await cleanAndCategorizeExpense({
+      rawString: rawText || 'UPI Payment',
+      amount: Number(amount) || 0,
+    });
+
+    const draft = new UpiDraft({
+      userId: req.user.id,
+      tripId: groupId,
+      rawText: rawText || '',
+      cleanMerchant: aiCleaned.cleanMerchant,
+      amount: Number(amount) || 0,
+      category: aiCleaned.category,
+      upiRef: upiRef || '',
+      status: 'pending_assignment',
+    });
+
+    await draft.save();
+    return res.status(201).json({ success: true, data: draft });
+  } catch (err) {
+    console.error('Error creating UPI draft:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.assignUpiDraft = async (req, res) => {
+  try {
+    const { groupId, draftId } = req.params;
+    const { mode = 'assign', splitBetween, paidBy, question } = req.body;
+
+    const group = await SplitGroup.findOne({
+      _id: groupId,
+      userId: req.user.id,
+    });
+    if (!group) {
+      return res.status(404).json({ success: false, message: 'Trip group not found' });
+    }
+
+    const draft = await UpiDraft.findOne({ _id: draftId, tripId: groupId });
+    if (!draft) {
+      return res.status(404).json({ success: false, message: 'UPI draft not found' });
+    }
+
+    if (mode === 'poll') {
+      draft.status = 'poll_created';
+      draft.poll = {
+        question: question || `Who shared the payment of ₹${draft.amount} to ${draft.cleanMerchant}?`,
+        options: group.members.map((m) => ({
+          memberId: m._id,
+          name: m.name,
+          votes: 0,
+        })),
+        closed: false,
+      };
+      await draft.save();
+      return res.json({ success: true, message: 'Poll created for UPI draft', data: draft });
+    }
+
+    // Default 'assign' mode: Pick people
+    const payerId = paidBy || group.ownerMemberId || group.members[0]?._id;
+    const participants =
+      Array.isArray(splitBetween) && splitBetween.length > 0
+        ? splitBetween
+        : group.members.map((m) => m._id);
+
+    const newExpense = {
+      description: draft.cleanMerchant,
+      amount: draft.amount,
+      paidBy: payerId,
+      splitBetween: participants,
+      date: draft.date || new Date(),
+      category: draft.category || 'Shared',
+      createdBy: req.user.id,
+    };
+
+    group.expenses.push(newExpense);
+    await group.save();
+
+    const createdExpense = group.expenses[group.expenses.length - 1];
+
+    draft.status = 'assigned_to_expense';
+    draft.assignedExpenseId = createdExpense._id;
+    await draft.save();
+
+    return res.json({
+      success: true,
+      message: 'Draft successfully converted to trip expense',
+      data: {
+        draft,
+        expense: createdExpense,
+        group: serializeGroup(group),
+      },
+    });
+  } catch (err) {
+    console.error('Error assigning UPI draft:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

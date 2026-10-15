@@ -15,10 +15,12 @@ const CATEGORIES = [
   'Other',
 ];
 
-const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
+const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = null }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState('idle'); // 'idle' | 'uploading' | 'processing' | 'completed' | 'failed'
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -30,7 +32,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     if (!selected) return;
 
     const mime = (selected.type || '').toLowerCase();
-    const validMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    const validMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'image/heic', 'image/heif'];
 
     if (mime === 'image/webp') {
       setError('WebP format is not supported by AWS Textract. Please select a JPEG, PNG, or PDF file.');
@@ -38,12 +40,11 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     }
 
     if (mime === 'image/heic' || mime === 'image/heif') {
-      setError('HEIC photos from iPhones are not supported by Textract. Please convert to JPEG or PNG.');
-      return;
+      setError('Note: iOS HEIC photos will be checked. If scanning fails, please convert to JPEG or PNG before uploading.');
     }
 
-    if (!validMimes.includes(mime)) {
-      setError('Please select a supported file format (JPEG, PNG, or PDF).');
+    if (!validMimes.includes(mime) && !selected.name.match(/\.(jpg|jpeg|png|pdf|heic)$/i)) {
+      setError('Please select a supported file format (JPEG, PNG, PDF, or HEIC).');
       return;
     }
 
@@ -58,6 +59,8 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     setPreviewUrl(url);
     setDraft(null);
     setSuccess(false);
+    setScanStatus('idle');
+    setUploadProgress(0);
   };
 
   const handleDrop = (e) => {
@@ -102,20 +105,30 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     ctx.fillText('₹220.00', 370, 205);
 
     ctx.textAlign = 'left';
-    ctx.fillText('CGST (2.5%) + SGST (2.5%)', 30, 235);
+    ctx.fillText('1x Hazelnut Syrup Add-on', 30, 235);
     ctx.textAlign = 'right';
-    ctx.fillText('₹28.25', 370, 235);
+    ctx.fillText('₹45.00', 370, 235);
 
     ctx.textAlign = 'center';
-    ctx.fillText('-----------------------------------', 200, 265);
+    ctx.fillText('-----------------------------------', 200, 260);
 
-    ctx.font = 'bold 18px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('TOTAL AMOUNT', 30, 305);
+    ctx.fillText('Subtotal:', 30, 280);
     ctx.textAlign = 'right';
-    ctx.fillText('₹593.25', 370, 305);
+    ctx.fillText('₹610.00', 370, 280);
 
-    ctx.font = '12px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('CGST 2.5% + SGST 2.5%:', 30, 300);
+    ctx.textAlign = 'right';
+    ctx.fillText('₹30.50', 370, 300);
+
+    ctx.font = 'bold 15px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('TOTAL AMOUNT:', 30, 330);
+    ctx.textAlign = 'right';
+    ctx.fillText('₹640.50', 370, 330);
+
+    ctx.font = '11px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('Payment: Paid via UPI (Auth #99281)', 200, 360);
     ctx.fillText('THANK YOU FOR VISITING!', 200, 400);
@@ -129,6 +142,68 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     }, 'image/png');
   };
 
+  /**
+   * Helper to upload directly to S3 with progress tracking via XMLHttpRequest
+   */
+  const uploadToS3WithProgress = (uploadUrl, fileToUpload) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', fileToUpload.type || 'image/jpeg');
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 85);
+          setUploadProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setUploadProgress(100);
+          resolve(true);
+        } else {
+          reject(new Error(`S3 upload failed with HTTP ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error during S3 direct upload'));
+      xhr.send(fileToUpload);
+    });
+  };
+
+  /**
+   * Polls GET /api/receipts/:id until status is 'completed' or 'failed'
+   */
+  const pollReceiptStatus = async (receiptId, maxAttempts = 25) => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((res) => setTimeout(res, 1500));
+      try {
+        const res = await api.get(`/receipts/${receiptId}`);
+        const data = res.data?.data;
+        if (!data) continue;
+
+        if (data.status === 'completed') {
+          return {
+            ...data.result,
+            receiptUrl: data.receiptUrl,
+            receiptId: data.receiptId,
+          };
+        }
+
+        if (data.status === 'failed') {
+          const err = new Error(data.error?.message || 'Receipt processing failed.');
+          err.code = data.error?.code;
+          throw err;
+        }
+      } catch (err) {
+        if (err.code) throw err;
+        console.debug(`[Receipt Polling] Attempt ${attempt + 1} waiting for completion...`);
+      }
+    }
+    return null;
+  };
+
   const handleScanReceipt = async () => {
     if (!file) {
       setError('Please select or drop a receipt image first.');
@@ -136,35 +211,44 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     }
 
     setScanning(true);
+    setScanStatus('uploading');
+    setUploadProgress(5);
     setError('');
     setSuccess(false);
 
     try {
       let scanResult = null;
 
-      // 1. Attempt AWS S3 direct presigned upload if configured
+      // 1. Modern Async Pipeline: Presigned S3 Upload + Event-driven SQS/Lambda
       try {
-        const presignRes = await api.post('/receipts/presigned-url', {
-          filename: file.name,
+        const presignRes = await api.post('/receipts/upload-url', {
           contentType: file.type || 'image/jpeg',
+          fileSize: file.size,
+          tripId: tripId || undefined,
         });
 
-        const payload = presignRes.data?.data || presignRes.data;
-        const uploadUrl = payload?.uploadUrl;
-        const bucket = payload?.bucket;
-        const key = payload?.key;
+        const uploadData = presignRes.data?.data || presignRes.data;
+        const uploadUrl = uploadData?.uploadUrl;
+        const receiptId = uploadData?.receiptId;
+        const key = uploadData?.key;
+        const bucket = uploadData?.bucket;
 
-        if (presignRes.data?.success && uploadUrl && key) {
-          const uploadRes = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': file.type || 'image/jpeg' },
-          });
+        if (uploadUrl && key) {
+          // Direct browser-to-S3 upload with live progress tracking
+          await uploadToS3WithProgress(uploadUrl, file);
+          setScanStatus('processing');
 
-          if (uploadRes.ok) {
+          // Poll asynchronous Lambda Textract worker
+          if (receiptId) {
+            scanResult = await pollReceiptStatus(receiptId, 20);
+          }
+
+          // If async queue was not yet triggered or polling timed out, fallback to synchronous analyze-s3
+          if (!scanResult) {
             const analyzeRes = await api.post('/receipts/analyze-s3', {
               bucket,
               key,
+              receiptId,
               contentType: file.type || 'image/jpeg',
             });
             if (analyzeRes.data?.success && analyzeRes.data.data) {
@@ -172,13 +256,16 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
             }
           }
         }
-      } catch (s3Err) {
-        // Fall back gracefully to standard server multipart upload
-        console.debug('S3 presigned upload not available or skipped, falling back to server route:', s3Err);
+      } catch (pipelineErr) {
+        console.warn('Async S3 receipt pipeline encountered error or fallback needed:', pipelineErr);
+        if (pipelineErr.code === 'UNSUPPORTED_FORMAT_HEIC') {
+          throw pipelineErr;
+        }
       }
 
-      // 2. Fallback to standard server multipart endpoint if S3 direct upload didn't complete
+      // 2. Resilient Fallback: Standard Server Multipart Route
       if (!scanResult) {
+        setScanStatus('processing');
         const formData = new FormData();
         formData.append('receipt', file);
 
@@ -196,13 +283,21 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
           ? scanResult.items.map((it) => ({
               description: it.quantity > 1 ? `${it.quantity}x ${it.name}` : it.name,
               name: it.name,
-              quantity: it.quantity,
-              price: it.price,
+              quantity: it.quantity || 1,
+              price: Number(it.price || 0),
+              lowConfidence: Boolean(it.lowConfidence),
             }))
           : Array.isArray(scanResult.lineItems)
-          ? scanResult.lineItems
+          ? scanResult.lineItems.map((it) => ({
+              description: it.description || it.name,
+              name: it.name || it.description,
+              quantity: it.quantity || 1,
+              price: Number(it.price || 0),
+              lowConfidence: Boolean(it.lowConfidence),
+            }))
           : [];
 
+        setScanStatus('completed');
         setDraft({
           type: 'expense',
           amount: scanResult.total !== undefined ? scanResult.total : (scanResult.amount || 0),
@@ -220,10 +315,12 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
           receiptUrl: scanResult.receiptUrl || '',
         });
       } else {
+        setScanStatus('failed');
         setError('Could not extract details from receipt image.');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Receipt scan request failed.');
+      setScanStatus('failed');
+      setError(err.response?.data?.message || err.message || 'Receipt scan request failed.');
     } finally {
       setScanning(false);
     }
@@ -236,12 +333,75 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
     }));
   };
 
+  /**
+   * Editable line item changes: updating name, quantity, or price
+   */
+  const handleItemChange = (index, field, value) => {
+    if (!draft || !draft.lineItems) return;
+    const updated = [...draft.lineItems];
+    const item = { ...updated[index] };
+
+    if (field === 'price') {
+      item.price = parseFloat(value) || 0;
+    } else if (field === 'quantity') {
+      item.quantity = parseInt(value, 10) || 1;
+    } else {
+      item[field] = value;
+    }
+    item.description = item.quantity > 1 ? `${item.quantity}x ${item.name}` : item.name;
+    updated[index] = item;
+
+    // Recalculate total sum
+    const newComputedTotal = updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + (Number(draft.tax) || 0);
+
+    setDraft((prev) => ({
+      ...prev,
+      lineItems: updated,
+      items: updated,
+      amount: Math.round((newComputedTotal + Number.EPSILON) * 100) / 100,
+      subtotal: Math.round((updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + Number.EPSILON) * 100) / 100,
+    }));
+  };
+
+  const handleAddItem = () => {
+    if (!draft) return;
+    const newItem = {
+      name: 'New Item',
+      description: 'New Item',
+      quantity: 1,
+      price: 0,
+      lowConfidence: false,
+    };
+    const updated = [...(draft.lineItems || []), newItem];
+    setDraft((prev) => ({
+      ...prev,
+      lineItems: updated,
+      items: updated,
+    }));
+  };
+
+  const handleDeleteItem = (index) => {
+    if (!draft || !draft.lineItems) return;
+    const updated = draft.lineItems.filter((_, i) => i !== index);
+    const newComputedTotal = updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + (Number(draft.tax) || 0);
+
+    setDraft((prev) => ({
+      ...prev,
+      lineItems: updated,
+      items: updated,
+      amount: Math.round((newComputedTotal + Number.EPSILON) * 100) / 100,
+      subtotal: Math.round((updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + Number.EPSILON) * 100) / 100,
+    }));
+  };
+
   const handleDiscard = () => {
     setDraft(null);
     setFile(null);
     setPreviewUrl('');
     setError('');
     setSuccess(false);
+    setScanStatus('idle');
+    setUploadProgress(0);
   };
 
   const handleConfirmAndSave = async (asDraft = false) => {
@@ -259,27 +419,29 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
         type: 'expense',
         category: draft.category,
         amount: Number(draft.amount),
-        description: draft.description,
         date: draft.date,
-        tags: ['receipt', 'aws-textract'],
-        mood: 'neutral',
-        isDraft: asDraft,
-        status: asDraft ? 'draft' : 'confirmed',
-        receiptS3Key: draft.receiptS3Key || '',
+        description: draft.description || 'Receipt Expense',
+        notes: draft.note || (draft.source ? `Scanned from receipt via ${draft.source}` : ''),
         receiptUrl: draft.receiptUrl || '',
+        receiptS3Key: draft.receiptS3Key || '',
+        metadata: {
+          scanned: true,
+          source: draft.source || 'aws-textract',
+          subtotal: draft.subtotal,
+          tax: draft.tax,
+          lineItems: draft.lineItems,
+          items: draft.items,
+        },
       };
 
       const res = await api.post('/transactions', payload);
-      if (res.data?.success) {
-        setSuccess(true);
-        setDraft(null);
-        setFile(null);
-        setPreviewUrl('');
-        if (onTransactionCreated) {
-          onTransactionCreated(res.data.data);
-        }
-        setTimeout(() => setSuccess(false), 3500);
+      setSuccess(true);
+      if (onTransactionCreated) {
+        onTransactionCreated(res.data?.data || res.data);
       }
+      setTimeout(() => {
+        handleDiscard();
+      }, 2000);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save transaction.');
     } finally {
@@ -290,39 +452,37 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
   return (
     <div
       style={{
-        background: compact ? 'transparent' : 'var(--bg-secondary)',
-        borderRadius: 'var(--radius-xl)',
-        padding: compact ? '0' : '1.25rem',
-        border: compact ? 'none' : '1px solid var(--border-color)',
-        marginBottom: compact ? '0' : '1.25rem',
+        padding: compact ? '0.75rem' : '1.25rem',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--border-color)',
+        background: 'var(--bg-card)',
       }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.1rem' }}>🧾</span>
-          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-            Receipt Scanner
-          </span>
-          <span
-            style={{
-              fontSize: '0.68rem',
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-full)',
-              background: 'rgba(245, 158, 11, 0.15)',
-              color: 'var(--accent-warning, #f59e0b)',
-              fontWeight: 600,
-            }}
-          >
-            AWS Textract
-          </span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+        <div>
+          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            🧾 Smart Receipt Scanner
+          </h4>
+          <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            Scan receipts to auto-extract items, tax, and totals with AWS Textract
+          </p>
         </div>
-        <span className="text-muted" style={{ fontSize: '0.72rem' }}>
-          Never saved without confirmation
+        <span
+          style={{
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            padding: '2px 8px',
+            borderRadius: 'var(--radius-full)',
+            background: 'rgba(99, 102, 241, 0.12)',
+            color: '#818CF8',
+          }}
+        >
+          AWS TEXTRACT
         </span>
       </div>
 
-      {/* Upload Dropzone */}
+      {/* Upload Zone */}
       {!draft && (
         <div
           onDragOver={(e) => e.preventDefault()}
@@ -330,52 +490,73 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
           onClick={() => fileInputRef.current?.click()}
           style={{
             border: '2px dashed var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.5rem',
+            borderRadius: 'var(--radius-md)',
+            padding: compact ? '1rem' : '1.5rem',
             textAlign: 'center',
             cursor: 'pointer',
-            background: 'rgba(82, 85, 119, 0.04)',
-            transition: 'border-color 0.2s ease',
+            background: file ? 'rgba(99, 102, 241, 0.04)' : 'transparent',
+            transition: 'border-color 0.2s',
           }}
         >
           <input
-            ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            ref={fileInputRef}
             onChange={handleFileChange}
+            accept="image/jpeg,image/png,image/jpg,application/pdf,image/heic,image/heif"
             style={{ display: 'none' }}
           />
 
-          {previewUrl ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-              <img
-                src={previewUrl}
-                alt="Receipt preview"
-                style={{
-                  maxHeight: '160px',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  border: '1px solid var(--border-color)',
-                }}
-              />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {file?.name} ({(file.size / 1024).toFixed(0)} KB)
-              </span>
-              <span className="text-muted" style={{ fontSize: '0.72rem' }}>
-                Click to change image or scan below
-              </span>
+          {file ? (
+            <div>
+              <span style={{ fontSize: '1.5rem' }}>📄</span>
+              <div style={{ fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>{file.name}</div>
+              <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                {(file.size / 1024).toFixed(1)} KB • Click or drop another to replace
+              </div>
             </div>
           ) : (
             <div>
-              <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>📸</div>
-              <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                Drag & drop your receipt photo here, or browse
+              <span style={{ fontSize: '1.75rem' }}>📸</span>
+              <div style={{ fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
+                Drop receipt photo here or click to browse
               </div>
-              <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>
-                Supports JPG, PNG, WebP up to 5MB
+              <div className="text-muted" style={{ fontSize: '0.72rem', marginTop: '2px' }}>
+                Supports JPEG, PNG, PDF up to 10MB
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Progress & Status Indicator */}
+      {scanning && (
+        <div style={{ marginTop: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <span>
+              {scanStatus === 'uploading'
+                ? 'Uploading receipt to encrypted private S3...'
+                : 'AWS Textract analyzing line items and prices...'}
+            </span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div
+            style={{
+              width: '100%',
+              height: '6px',
+              borderRadius: 'var(--radius-full)',
+              background: 'var(--bg-secondary)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${uploadProgress}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #6366f1, #10b981)',
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -482,7 +663,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
                 Review & Confirm Receipt Details
               </div>
               <div className="text-muted" style={{ fontSize: '0.72rem', marginTop: '2px' }}>
-                Extracted via AWS Textract AnalyzeExpense • Verify fields before saving
+                Extracted via AWS Textract AnalyzeExpense • Adjust line items before splitting
               </div>
             </div>
             <span
@@ -557,63 +738,121 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
             </div>
           </div>
 
-          {/* Line items if detected by Textract */}
-          {draft.lineItems?.length > 0 && (
-            <div
-              style={{
-                marginTop: '0.75rem',
-                padding: '0.65rem 0.85rem',
-                background: 'var(--bg-secondary)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-color)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                  DETECTED LINE ITEMS ({draft.lineItems.length})
-                </span>
+          {/* EDITABLE LINE ITEMS TABLE */}
+          <div
+            style={{
+              marginTop: '0.85rem',
+              padding: '0.75rem 0.85rem',
+              background: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                EDITABLE LINE ITEMS ({draft.lineItems?.length || 0})
+              </span>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                 {draft.subtotal > 0 && (
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                     Subtotal: ₹{Number(draft.subtotal).toFixed(2)} {draft.tax > 0 ? `+ Tax: ₹${Number(draft.tax).toFixed(2)}` : ''}
                   </span>
                 )}
-              </div>
-
-              {draft.lowConfidenceItems?.length > 0 && (
-                <div
-                  style={{
-                    padding: '0.4rem 0.6rem',
-                    marginBottom: '0.5rem',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'rgba(245, 158, 11, 0.12)',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                    color: 'var(--accent-warning, #f59e0b)',
-                    fontSize: '0.72rem',
-                    fontWeight: 500,
-                  }}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleAddItem}
+                  style={{ fontSize: '0.7rem', padding: '2px 8px', height: '24px' }}
                 >
-                  ⚠️ {draft.lowConfidenceItems.length} item(s) detected with low confidence (&lt;80%). Please review names and prices before splitting.
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {draft.lineItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    <span>• {item.description}</span>
-                    <span>₹{item.price?.toFixed(2)}</span>
-                  </div>
-                ))}
+                  + Add Item
+                </Button>
               </div>
             </div>
-          )}
+
+            {draft.lowConfidenceItems?.length > 0 && (
+              <div
+                style={{
+                  padding: '0.4rem 0.6rem',
+                  marginBottom: '0.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  color: 'var(--accent-warning, #f59e0b)',
+                  fontSize: '0.72rem',
+                  fontWeight: 500,
+                }}
+              >
+                ⚠️ {draft.lowConfidenceItems.length} item(s) detected with low confidence (&lt;80%). Highlighted below for your review.
+              </div>
+            )}
+
+            {/* Items Table */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {(draft.lineItems || []).map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(140px, 1fr) 50px 85px 30px',
+                    gap: '0.4rem',
+                    alignItems: 'center',
+                    padding: '4px 6px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: item.lowConfidence ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-primary)',
+                    border: item.lowConfidence ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--border-color)',
+                  }}
+                >
+                  <input
+                    type="text"
+                    className="input-glass"
+                    value={item.name}
+                    placeholder="Item name"
+                    onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                    style={{ fontSize: '0.75rem', padding: '4px 6px', height: '28px' }}
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    className="input-glass"
+                    value={item.quantity}
+                    placeholder="Qty"
+                    onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                    style={{ fontSize: '0.75rem', padding: '4px 4px', height: '28px', textAlign: 'center' }}
+                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input-glass"
+                      value={item.price}
+                      placeholder="Price"
+                      onChange={(e) => handleItemChange(idx, 'price', e.target.value)}
+                      style={{ fontSize: '0.75rem', padding: '4px 6px', height: '28px', fontWeight: 600 }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteItem(idx)}
+                    title="Remove item"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Action buttons */}
           <div
@@ -638,29 +877,14 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false }) => {
             </Button>
             <Button
               type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => handleConfirmAndSave(true)}
-              disabled={saving || !draft.amount || Number(draft.amount) <= 0}
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 14px',
-                borderColor: '#6366F1',
-                color: '#A5B4FC',
-              }}
-            >
-              💾 Save as Draft
-            </Button>
-            <Button
-              type="button"
               variant="primary"
               size="sm"
               onClick={() => handleConfirmAndSave(false)}
               disabled={saving || !draft.amount || Number(draft.amount) <= 0}
               loading={saving}
-              style={{ fontSize: '0.82rem', padding: '7px 22px', fontWeight: 700 }}
+              style={{ fontSize: '0.8rem', padding: '6px 18px' }}
             >
-              ✓ Confirm & Save
+              Confirm & Save
             </Button>
           </div>
         </div>

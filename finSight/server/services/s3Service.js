@@ -27,9 +27,17 @@ const s3Client = new S3Client({
  * @param {string} contentType - MIME type (image/jpeg, image/png, image/webp)
  * @returns {Promise<{ uploadUrl: string, key: string, bucket: string, expiresIn: number }>}
  */
-async function generateReceiptUploadUrl(userId, contentType = 'image/jpeg') {
-  const fileId = crypto.randomUUID();
-  const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+async function generateReceiptUploadUrl(userId, contentType = 'image/jpeg', explicitFileId = null) {
+  const fileId = explicitFileId || crypto.randomUUID();
+  const ext = contentType.includes('png')
+    ? 'png'
+    : contentType.includes('pdf')
+    ? 'pdf'
+    : contentType.includes('heic') || contentType.includes('heif')
+    ? 'heic'
+    : contentType.includes('webp')
+    ? 'webp'
+    : 'jpg';
   const key = `receipts/${userId}/${fileId}.${ext}`;
 
   const command = new PutObjectCommand({
@@ -45,6 +53,7 @@ async function generateReceiptUploadUrl(userId, contentType = 'image/jpeg') {
   return {
     uploadUrl,
     key,
+    fileId,
     bucket: bucketName,
     expiresIn,
   };

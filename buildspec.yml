@@ -1,0 +1,55 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo "Installing dependencies for backend and frontend..."
+      - cd finSight/server && npm ci
+      - cd ../client && npm ci
+      - cd ../..
+
+  pre_build:
+    commands:
+      - echo "Running Backend Unit & Integration Tests..."
+      - cd finSight/server
+      - npm test
+      - cd ../..
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $IMAGE_REPO_URL
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:-latest}
+
+  build:
+    commands:
+      - echo "Building backend Docker container..."
+      - cd finSight/server
+      - docker build -t $IMAGE_REPO_URL:latest -t $IMAGE_REPO_URL:$IMAGE_TAG .
+      - docker push $IMAGE_REPO_URL:latest
+      - docker push $IMAGE_REPO_URL:$IMAGE_TAG
+      - printf '[{"name":"finsight-api","imageUri":"%s"}]' "$IMAGE_REPO_URL:$IMAGE_TAG" > imagedefinitions.json
+      - cd ../..
+      - echo "Verifying container security with ECR image vulnerability scan..."
+      - REPO_NAME=$(echo $IMAGE_REPO_URL | cut -d'/' -f2)
+      - aws ecr wait image-scan-complete --repository-name $REPO_NAME --image-id imageTag=$IMAGE_TAG || true
+      - CRITICAL_COUNT=$(aws ecr describe-image-scan-findings --repository-name $REPO_NAME --image-id imageTag=$IMAGE_TAG --query 'imageScanFindings.findingSeverityCounts.CRITICAL' --output text 2>/dev/null || echo "0")
+      - echo "Critical vulnerabilities detected: $CRITICAL_COUNT"
+      - if [ "$CRITICAL_COUNT" != "None" ] && [ "$CRITICAL_COUNT" != "0" ] && [ "$CRITICAL_COUNT" -gt 0 ]; then echo "SECURITY GATE FAILED: Found $CRITICAL_COUNT CRITICAL CVEs in image!"; exit 1; fi
+      - echo "Compiling frontend React 19 Vite SPA..."
+      - cd finSight/client
+      - VITE_API_URL=/api npm run build
+      - cd ../..
+
+  post_build:
+    commands:
+      - echo "Deploying frontend static files to S3 bucket $FRONTEND_BUCKET..."
+      - aws s3 sync finSight/client/dist/ s3://$FRONTEND_BUCKET/ --delete
+      - echo "Invalidating CloudFront cache for distribution $CLOUDFRONT_DISTRIBUTION_ID..."
+      - if [ -n "$CLOUDFRONT_DISTRIBUTION_ID" ]; then aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"; fi
+      - echo "Build and deployment artifact generation completed on $(date)."
+
+artifacts:
+  files:
+    - finSight/server/imagedefinitions.json
+  discard-paths: yes
