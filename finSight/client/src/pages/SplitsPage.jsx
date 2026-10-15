@@ -3,6 +3,7 @@ import Card from '../components/Card.jsx';
 import BalanceChip from '../components/BalanceChip.jsx';
 import Modal from '../components/Modal.jsx';
 import TripModeWidget from '../components/TripModeWidget.jsx';
+import UpiSettlementModal from '../components/UpiSettlementModal.jsx';
 import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 import useAuth from '../hooks/useAuth.js';
@@ -47,6 +48,8 @@ const SplitsPage = () => {
   const [groupForm, setGroupForm] = useState(emptyGroupForm);
   const [expenseForm, setExpenseForm] = useState(emptyExpenseForm);
   const [settlementForm, setSettlementForm] = useState(emptySettlementForm);
+  const [upiModalOpen, setUpiModalOpen] = useState(false);
+  const [upiDebt, setUpiDebt] = useState(null);
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group._id === selectedGroupId) || groups[0],
@@ -458,11 +461,9 @@ const SplitsPage = () => {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {selectedGroup.simplifiedDebts.map((debt) => {
-                        const upiPayUrl = `upi://pay?pn=${encodeURIComponent(debt.toName)}&am=${debt.amount}&cu=INR&tn=${encodeURIComponent(`FinSight - ${selectedGroup.name}`)}`;
-                        return (
-                          <div
-                            key={`${debt.from}-${debt.to}-${debt.amount}`}
+                      {selectedGroup.simplifiedDebts.map((debt) => (
+                        <div
+                          key={`${debt.from}-${debt.to}-${debt.amount}`}
                             style={{
                               display: 'flex',
                               justifyContent: 'space-between',
@@ -485,10 +486,13 @@ const SplitsPage = () => {
                             </div>
 
                             <div style={{ display: 'flex', gap: '6px' }}>
-                              <a
-                                href={upiPayUrl}
-                                onClick={() => openSettlementModal(debt)}
-                                title="Open UPI app (Google Pay, PhonePe, Paytm) to settle directly"
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUpiDebt(debt);
+                                  setUpiModalOpen(true);
+                                }}
+                                title="Open UPI QR code / deep-link to settle via Google Pay, PhonePe, Paytm"
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -496,15 +500,16 @@ const SplitsPage = () => {
                                   padding: '5px 10px',
                                   background: 'linear-gradient(135deg, #10B981, #059669)',
                                   color: '#FFFFFF',
+                                  border: 'none',
                                   borderRadius: 'var(--radius-sm, 8px)',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
-                                  textDecoration: 'none',
+                                  cursor: 'pointer',
                                   boxShadow: 'var(--shadow-xs)',
                                 }}
                               >
                                 ⚡ Settle via UPI
-                              </a>
+                              </button>
                               <Button
                                 type="button"
                                 variant="secondary"
@@ -515,8 +520,7 @@ const SplitsPage = () => {
                               </Button>
                             </div>
                           </div>
-                        );
-                      })}
+                        ))}
                     </div>
                   )}
                 </Card>
@@ -751,6 +755,18 @@ const SplitsPage = () => {
           </Button>
         </form>
       </Modal>
+
+      <UpiSettlementModal
+        isOpen={upiModalOpen}
+        onClose={() => setUpiModalOpen(false)}
+        debt={upiDebt}
+        groupId={selectedGroup?._id}
+        groupName={selectedGroup?.name}
+        onSettled={(updatedGroup) => {
+          if (updatedGroup) replaceGroup(updatedGroup);
+          else fetchGroups();
+        }}
+      />
     </>
   );
 };

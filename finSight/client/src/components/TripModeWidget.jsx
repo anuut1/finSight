@@ -3,6 +3,7 @@ import api from '../api/axios';
 import Modal from './Modal';
 import Button from './Button';
 import TripAddExpenseModal from './TripAddExpenseModal';
+import UpiSettlementModal from './UpiSettlementModal';
 
 const CURRENCIES = [
   { code: 'INR', symbol: '₹', label: 'INR (₹)' },
@@ -37,6 +38,8 @@ const TripModeWidget = ({ onTripChanged }) => {
   // Settlement inline state
   const [settlingDebt, setSettlingDebt] = useState(null);
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [upiModalOpen, setUpiModalOpen] = useState(false);
+  const [upiDebt, setUpiDebt] = useState(null);
 
   const fetchActiveTrip = async () => {
     try {
@@ -527,7 +530,7 @@ Calculated via FinSight`;
                         <span style={{ fontWeight: 600, color: 'var(--accent-success)' }}>{debt.toName}</span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span
                           style={{
                             fontWeight: 700,
@@ -538,6 +541,32 @@ Calculated via FinSight`;
                           {symCode}
                           {debt.amount.toLocaleString()}
                         </span>
+
+                        {(!endedSummary?.tripSummary?.currency || endedSummary?.tripSummary?.currency === 'INR') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUpiDebt(debt);
+                              setUpiModalOpen(true);
+                            }}
+                            title="Open UPI QR / deep-link"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '5px 8px',
+                              background: 'linear-gradient(135deg, #10B981, #059669)',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: 'var(--radius-sm, 8px)',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            ⚡ UPI
+                          </button>
+                        )}
 
                         <Button size="sm" onClick={() => handleRecordSettlement(debt)} loading={isSettling}>Settle</Button>
                       </div>
@@ -628,6 +657,27 @@ Calculated via FinSight`;
         trip={activeTrip}
         symbol={sym}
         onAdded={() => { fetchActiveTrip(); if (onTripChanged) onTripChanged(activeTrip); }}
+      />
+
+      <UpiSettlementModal
+        isOpen={upiModalOpen}
+        onClose={() => setUpiModalOpen(false)}
+        debt={upiDebt}
+        groupId={activeTrip?._id || endedSummary?._id}
+        groupName={activeTrip?.name || endedSummary?.name || 'Trip'}
+        onSettled={async () => {
+          const tripId = activeTrip?._id || endedSummary?._id;
+          if (!tripId) return;
+          try {
+            const sumRes = await api.get(`/splits/trips/${tripId}/summary`);
+            if (sumRes.data?.success) {
+              if (activeTrip) setActiveTrip(sumRes.data.data);
+              if (endedSummary) setEndedSummary(sumRes.data.data);
+            }
+          } catch (e) {
+            console.warn('Could not refresh trip summary:', e);
+          }
+        }}
       />
     </>
   );
