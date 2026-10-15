@@ -40,6 +40,7 @@ const allowedOrigins = new Set(
     'http://localhost:5174',
     'http://localhost:5175',
     'https://finsight.anushree-tiwari2024.workers.dev',
+    'https://fin-sight-indol-ten.vercel.app',
     process.env.CLIENT_URL,
   ].filter(Boolean)
 );
@@ -49,16 +50,19 @@ const isAllowedOrigin = (origin) => {
   if (allowedOrigins.has(origin)) return true;
 
   if (isProd) {
-    // In production, strictly match configured client URL, CloudFront, or official domains
+    // In production, match configured client URL, CloudFront, Vercel, or Cloudflare domains
     if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return true;
     if (/^https:\/\/[a-z0-9-]+\.cloudfront\.net$/i.test(origin)) return true;
-    if (/^https:\/\/finsight\.[a-z0-9-]+\.workers\.dev$/i.test(origin)) return true;
+    if (/^https:\/\/[a-z0-9-]+\.workers\.dev$/i.test(origin)) return true;
+    if (/^https:\/\/[a-z0-9-]+\.pages\.dev$/i.test(origin)) return true;
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return true;
     return false;
   }
 
   // Development origins
   if (/^http:\/\/localhost(:\d+)?$/i.test(origin)) return true;
   if (/^http:\/\/127\.0\.0\.1(:\d+)?$/i.test(origin)) return true;
+  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return true;
   return false;
 };
 
@@ -68,7 +72,7 @@ app.use(
       if (isAllowedOrigin(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
+        callback(null, false);
       }
     },
     credentials: true,
@@ -96,6 +100,15 @@ app.use('/api/analytics', authMiddleware, analyticsRoutes);
 app.use('/api/splits', authMiddleware, splitRoutes);
 app.use('/api/recurring', authMiddleware, recurringRoutes);
 app.use('/api/receipts', authMiddleware, receiptRoutes);
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('[Unhandled Error]', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal server error',
+  });
+});
 
 mongoose
   .connect(MONGO_URI)
