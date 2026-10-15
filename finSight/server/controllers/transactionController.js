@@ -9,6 +9,7 @@ const {
   sendEodReminderForUser,
   sweepAllUsersForEodReminders,
 } = require('../services/eodReminderService');
+const { logger } = require('../utils/logger');
 
 exports.getTransactions = async (req, res) => {
   try {
@@ -254,7 +255,7 @@ exports.scanReceiptEndpoint = async (req, res) => {
       data: result,
     });
   } catch (err) {
-    console.error('Receipt scan error:', err.name || 'Error', err.message);
+    logger.error({ err, mime: req.file?.mimetype }, 'Receipt scan endpoint failed');
     const status = err.statusCode || err.status || 500;
     return res.status(status).json({
       success: false,

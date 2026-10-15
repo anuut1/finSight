@@ -25,6 +25,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [scanMode, setScanMode] = useState('auto'); // 'auto' (S3 async pipeline with fallback) | 'direct' (direct multipart sync)
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -35,16 +36,17 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     const validMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'image/heic', 'image/heif'];
 
     if (mime === 'image/webp') {
-      setError('WebP format is not supported by AWS Textract. Please select a JPEG, PNG, or PDF file.');
+      setError('WebP format is not supported by AWS Textract. Please upload a JPEG, PNG, or PDF file.');
       return;
     }
 
-    if (mime === 'image/heic' || mime === 'image/heif') {
-      setError('Note: iOS HEIC photos will be checked. If scanning fails, please convert to JPEG or PNG before uploading.');
+    if (mime === 'image/heic' || mime === 'image/heif' || selected.name.match(/\.(heic|heif)$/i)) {
+      setError('Unsupported format: iPhone HEIC photos are not directly supported by AWS Textract. Please convert your photo to JPEG or PNG before uploading.');
+      return;
     }
 
-    if (!validMimes.includes(mime) && !selected.name.match(/\.(jpg|jpeg|png|pdf|heic)$/i)) {
-      setError('Please select a supported file format (JPEG, PNG, PDF, or HEIC).');
+    if (!validMimes.includes(mime) && !selected.name.match(/\.(jpg|jpeg|png|pdf)$/i)) {
+      setError('Please select a supported file format (JPEG, PNG, or PDF up to 10MB).');
       return;
     }
 
@@ -219,51 +221,53 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     try {
       let scanResult = null;
 
-      // 1. Modern Async Pipeline: Presigned S3 Upload + Event-driven SQS/Lambda
-      try {
-        const presignRes = await api.post('/receipts/upload-url', {
-          contentType: file.type || 'image/jpeg',
-          fileSize: file.size,
-          tripId: tripId || undefined,
-        });
+      // 1. If scanMode === 'auto', try modern S3 Async Pipeline with automatic fallback
+      if (scanMode === 'auto') {
+        try {
+          const presignRes = await api.post('/receipts/upload-url', {
+            contentType: file.type || 'image/jpeg',
+            fileSize: file.size,
+            tripId: tripId || undefined,
+          });
 
-        const uploadData = presignRes.data?.data || presignRes.data;
-        const uploadUrl = uploadData?.uploadUrl;
-        const receiptId = uploadData?.receiptId;
-        const key = uploadData?.key;
-        const bucket = uploadData?.bucket;
+          const uploadData = presignRes.data?.data || presignRes.data;
+          const uploadUrl = uploadData?.uploadUrl;
+          const receiptId = uploadData?.receiptId;
+          const key = uploadData?.key;
+          const bucket = uploadData?.bucket;
 
-        if (uploadUrl && key) {
-          // Direct browser-to-S3 upload with live progress tracking
-          await uploadToS3WithProgress(uploadUrl, file);
-          setScanStatus('processing');
+          if (uploadUrl && key) {
+            // Direct browser-to-S3 upload with live progress tracking
+            await uploadToS3WithProgress(uploadUrl, file);
+            setScanStatus('processing');
 
-          // Poll asynchronous Lambda Textract worker
-          if (receiptId) {
-            scanResult = await pollReceiptStatus(receiptId, 20);
-          }
+            // Poll asynchronous Lambda Textract worker (up to ~35s)
+            if (receiptId) {
+              scanResult = await pollReceiptStatus(receiptId, 22);
+            }
 
-          // If async queue was not yet triggered or polling timed out, fallback to synchronous analyze-s3
-          if (!scanResult) {
-            const analyzeRes = await api.post('/receipts/analyze-s3', {
-              bucket,
-              key,
-              receiptId,
-              contentType: file.type || 'image/jpeg',
-            });
-            if (analyzeRes.data?.success && analyzeRes.data.data) {
-              scanResult = analyzeRes.data.data;
+            // If async queue was not yet triggered or polling timed out, fallback to synchronous analyze-s3
+            if (!scanResult) {
+              const analyzeRes = await api.post('/receipts/analyze-s3', {
+                bucket,
+                key,
+                receiptId,
+                contentType: file.type || 'image/jpeg',
+              });
+              if (analyzeRes.data?.success && (analyzeRes.data.data || analyzeRes.data.items)) {
+                scanResult = analyzeRes.data.data || analyzeRes.data;
+              }
             }
           }
-        }
-      } catch (pipelineErr) {
-        console.warn('Async S3 receipt pipeline encountered error or fallback needed:', pipelineErr);
-        if (pipelineErr.code === 'UNSUPPORTED_FORMAT_HEIC') {
-          throw pipelineErr;
+        } catch (pipelineErr) {
+          console.warn('Async S3 receipt pipeline encountered error, trying synchronous fallback:', pipelineErr);
+          if (pipelineErr.code === 'UNSUPPORTED_FORMAT_HEIC') {
+            throw pipelineErr;
+          }
         }
       }
 
-      // 2. Resilient Fallback: Standard Server Multipart Route
+      // 2. Resilient Direct Fallback: Standard Server Multipart Route
       if (!scanResult) {
         setScanStatus('processing');
         const formData = new FormData();
@@ -273,8 +277,8 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
           headers: { 'Content-Type': 'multipart/form-data' },
         });
 
-        if (res.data?.success && res.data.data) {
-          scanResult = res.data.data;
+        if (res.data?.success && (res.data.data || res.data.items)) {
+          scanResult = res.data.data || res.data;
         }
       }
 
@@ -468,19 +472,25 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
             Scan receipts to auto-extract items, tax, and totals with AWS Textract
           </p>
         </div>
-        <span
-          style={{
-            fontSize: '0.68rem',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            padding: '2px 8px',
-            borderRadius: 'var(--radius-full)',
-            background: 'rgba(99, 102, 241, 0.12)',
-            color: '#818CF8',
-          }}
-        >
-          AWS TEXTRACT
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button
+            type="button"
+            onClick={() => setScanMode((prev) => (prev === 'auto' ? 'direct' : 'auto'))}
+            title={scanMode === 'auto' ? 'Click to switch to Direct Synchronous Scan' : 'Click to switch to S3 Async Pipeline'}
+            style={{
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-full)',
+              background: scanMode === 'auto' ? 'rgba(99, 102, 241, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+              color: scanMode === 'auto' ? '#818CF8' : 'var(--accent-success)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {scanMode === 'auto' ? '⚡ MODE: S3 + ASYNC' : '⚡ MODE: DIRECT SYNC'}
+          </button>
+        </div>
       </div>
 
       {/* Upload Zone */}
@@ -616,20 +626,69 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
         </div>
       )}
 
-      {/* Error */}
+      {/* Error & Retry Banner */}
       {error && (
         <div
           style={{
             marginTop: '0.75rem',
-            padding: '0.5rem 0.75rem',
+            padding: '0.65rem 0.85rem',
             borderRadius: 'var(--radius-md)',
             background: 'rgba(239, 68, 68, 0.1)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
             color: 'var(--accent-danger)',
             fontSize: '0.8rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
           }}
         >
-          ⚠️ {error}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span>⚠️</span>
+            <span style={{ flex: 1 }}>{error}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '2px' }}>
+            {file && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleScanReceipt}
+                disabled={scanning}
+                style={{
+                  height: '28px',
+                  padding: '0 12px',
+                  fontSize: '0.72rem',
+                  borderColor: 'rgba(239, 68, 68, 0.4)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                🔄 Retry Scan
+              </Button>
+            )}
+
+            {scanMode === 'auto' && file && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setScanMode('direct');
+                  setTimeout(() => handleScanReceipt(), 50);
+                }}
+                disabled={scanning}
+                style={{
+                  height: '28px',
+                  padding: '0 12px',
+                  fontSize: '0.72rem',
+                  borderColor: 'rgba(99, 102, 241, 0.4)',
+                  color: 'var(--accent-primary)',
+                }}
+              >
+                ⚡ Retry with Direct Server Scan
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -805,6 +864,21 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
 
             {/* Items Table */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {(!draft.lineItems || draft.lineItems.length === 0) && (
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    textAlign: 'center',
+                    background: 'var(--bg-primary)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px dashed var(--border-color)',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  ℹ️ No line items detected by OCR. You can click <strong>+ Add Item</strong> above to enter them manually for itemized splitting.
+                </div>
+              )}
               {(draft.lineItems || []).map((item, idx) => (
                 <div
                   key={idx}

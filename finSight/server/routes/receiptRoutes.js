@@ -4,6 +4,7 @@ const { generateReceiptUploadUrl, generateReceiptViewUrl, bucketName } = require
 const { analyzeReceiptExpense } = require('../services/textractService');
 const Receipt = require('../models/Receipt');
 const SplitGroup = require('../models/SplitGroup');
+const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
@@ -225,7 +226,7 @@ router.post('/analyze-s3', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Error analyzing S3 receipt:', err.name || 'Error', err.message);
+    logger.error({ err, key: req.body?.key, receiptId: req.body?.receiptId }, 'Error analyzing S3 receipt');
     const status = err.statusCode || err.status || 500;
     return res.status(status).json({
       success: false,
