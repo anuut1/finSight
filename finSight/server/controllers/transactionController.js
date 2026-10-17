@@ -367,7 +367,10 @@ exports.magicApproveDrafts = async (req, res) => {
       return res.status(400).send('<h1>Invalid or missing approval token</h1>');
     }
 
-    const secret = process.env.JWT_SECRET || 'finsight_jwt_secret_dev';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      return res.status(500).send('Server configuration error: JWT_SECRET missing');
+    }
     let decoded;
     try {
       decoded = jwt.verify(token, secret);

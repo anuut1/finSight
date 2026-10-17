@@ -19,6 +19,7 @@ exports.getBudgets = async (req, res) => {
         $match: {
           userId: userObjectId,
           type: 'expense',
+          status: { $ne: 'draft' },
           date: { $gte: start, $lte: end },
         },
       },
@@ -56,13 +57,16 @@ exports.createBudget = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Category and limit are required' });
     }
 
-    const budget = await Budget.create({
-      userId: req.user.id,
-      category,
-      limit,
-      month,
-      year,
-    });
+    const budget = await Budget.findOneAndUpdate(
+      {
+        userId: req.user.id,
+        category,
+        month,
+        year,
+      },
+      { limit },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
 
     return res.status(201).json({ success: true, data: budget });
   } catch (err) {

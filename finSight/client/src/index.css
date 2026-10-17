@@ -892,3 +892,51 @@ tbody tr:hover {
   }
 }
 
+@media (max-width: 360px) {
+  .app-shell > main {
+    padding: 10px 12px !important;
+  }
+
+  .card,
+  .glass-card {
+    padding: 1rem 0.85rem !important;
+  }
+
+  .hero-safe-to-spend {
+    padding: 1.25rem 1rem !important;
+  }
+
+  h1 {
+    font-size: 1.35rem !important;
+  }
+
+  .btn {
+    padding: 0.5rem 0.85rem !important;
+    font-size: 0.8rem !important;
+  }
+}
+
+/* ==================== KEYBOARD FOCUS & ACCESSIBILITY ==================== */
+:focus-visible {
+  outline: 2px solid var(--color-ink, #14151A) !important;
+  outline-offset: 2px !important;
+}
+
+[data-theme='dark'] :focus-visible {
+  outline: 2px solid #FFFFFF !important;
+  outline-offset: 2px !important;
+}
+
+/* ==================== PREFERS REDUCED MOTION ==================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+

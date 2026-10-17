@@ -36,17 +36,17 @@ const TransactionsPage = () => {
     }
   }, [recentlyAddedTx]);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (activeFilters = filters, activePage = page) => {
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
-      params.set('page', page);
+      params.set('page', activePage);
       params.set('limit', limit);
-      if (filters.type) params.set('type', filters.type);
-      if (filters.category) params.set('category', filters.category);
-      if (filters.startDate) params.set('startDate', filters.startDate);
-      if (filters.endDate) params.set('endDate', filters.endDate);
+      if (activeFilters.type) params.set('type', activeFilters.type);
+      if (activeFilters.category) params.set('category', activeFilters.category);
+      if (activeFilters.startDate) params.set('startDate', activeFilters.startDate);
+      if (activeFilters.endDate) params.set('endDate', activeFilters.endDate);
 
       const res = await api.get(`/transactions?${params.toString()}`);
       if (res.data?.success) {
@@ -59,14 +59,31 @@ const TransactionsPage = () => {
     }
   };
 
+  // Debounced search on filters change
   useEffect(() => {
-    fetchTransactions();
+    const handler = setTimeout(() => {
+      setPage(1);
+      fetchTransactions(filters, 1);
+    }, 350);
+    return () => clearTimeout(handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+  useEffect(() => {
+    fetchTransactions(filters, page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   const applyFilters = () => {
     setPage(1);
-    fetchTransactions();
+    fetchTransactions(filters, 1);
+  };
+
+  const handleClearFilters = () => {
+    const reset = { type: '', category: '', startDate: '', endDate: '' };
+    setFilters(reset);
+    setPage(1);
+    fetchTransactions(reset, 1);
   };
 
   const handleChangeFilter = (e) => {
@@ -226,6 +243,15 @@ const TransactionsPage = () => {
           >
             Filter
           </Button>
+          {(filters.type || filters.category || filters.startDate || filters.endDate) && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleClearFilters}
+            >
+              Clear
+            </Button>
+          )}
         </div>
       </Card>
 
