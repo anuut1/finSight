@@ -41,7 +41,10 @@ const getSnsClient = () => {
  * Generate a signed one-tap magic link token for approving drafts without re-authenticating
  */
 const generateApprovalToken = (userId, draftIds) => {
-  const secret = process.env.JWT_SECRET || 'finsight_jwt_secret_dev';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is missing.');
+  }
   return jwt.sign(
     {
       userId: userId.toString(),

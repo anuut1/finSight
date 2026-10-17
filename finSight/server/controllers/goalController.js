@@ -40,16 +40,30 @@ exports.updateGoal = async (req, res) => {
     const { id } = req.params;
     const updates = {};
 
-    if (req.body.savedAmount !== undefined) updates.savedAmount = req.body.savedAmount;
+    if (req.body.title) updates.title = req.body.title.trim();
+    if (req.body.targetAmount !== undefined) updates.targetAmount = Number(req.body.targetAmount);
+    if (req.body.savedAmount !== undefined) updates.savedAmount = Number(req.body.savedAmount);
+    if (req.body.deadline) updates.deadline = req.body.deadline;
     if (req.body.status) updates.status = req.body.status;
+
+    const existing = await Goal.findOne({ _id: id, userId: req.user.id });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Goal not found' });
+    }
+
+    const newTarget = updates.targetAmount !== undefined ? updates.targetAmount : existing.targetAmount;
+    const newSaved = updates.savedAmount !== undefined ? updates.savedAmount : existing.savedAmount;
+
+    // Auto complete if saved reaches target and user didn't explicitly override status
+    if (!req.body.status && newSaved >= newTarget) {
+      updates.status = 'completed';
+    } else if (!req.body.status && newSaved < newTarget && existing.status === 'completed') {
+      updates.status = 'active';
+    }
 
     const goal = await Goal.findOneAndUpdate({ _id: id, userId: req.user.id }, updates, {
       new: true,
     });
-
-    if (!goal) {
-      return res.status(404).json({ success: false, message: 'Goal not found' });
-    }
 
     return res.json({ success: true, data: goal });
   } catch (err) {

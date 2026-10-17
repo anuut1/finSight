@@ -8,7 +8,10 @@ const {
 const { sendWelcomeEmailViaSes } = require('../services/emailService');
 
 const generateToken = (userId) => {
-  const secret = process.env.JWT_SECRET || 'your_secret_key_here';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is missing.');
+  }
   return jwt.sign({ id: userId }, secret, { expiresIn: '7d' });
 };
 
@@ -63,6 +66,9 @@ exports.register = async (req, res) => {
       },
     });
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Email already in use' });
+    }
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }

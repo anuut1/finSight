@@ -10,6 +10,21 @@ const logger = pino({
     env: process.env.NODE_ENV || 'development',
   },
   timestamp: pino.stdTimeFunctions.isoTime,
+  redact: {
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'password',
+      'newPassword',
+      'token',
+      'secret',
+      '*.password',
+      '*.newPassword',
+      '*.token',
+      '*.secret',
+    ],
+    remove: false,
+  },
 });
 
 /**

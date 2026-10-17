@@ -149,12 +149,13 @@ function parseWithHeuristics(text, context = {}) {
 
   // Date detection
   let date = today;
+  const baseDate = context.currentDate ? new Date(context.currentDate) : new Date();
   if (/yesterday/i.test(lower)) {
-    const d = new Date();
+    const d = new Date(baseDate);
     d.setDate(d.getDate() - 1);
     date = d.toISOString().slice(0, 10);
   } else if (/tomorrow/i.test(lower)) {
-    const d = new Date();
+    const d = new Date(baseDate);
     d.setDate(d.getDate() + 1);
     date = d.toISOString().slice(0, 10);
   }

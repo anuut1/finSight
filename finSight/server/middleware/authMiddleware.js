@@ -30,8 +30,12 @@ const authMiddleware = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
 
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ success: false, message: 'Server configuration error: JWT_SECRET is missing' });
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_secret_key_here');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = { id: decoded.id };
     next();
   } catch (err) {

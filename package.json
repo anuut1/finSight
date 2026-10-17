@@ -8,6 +8,13 @@
     "server": "npm run server --prefix finSight",
     "client": "npm run client --prefix finSight",
     "build": "npm run build --prefix finSight/client",
-    "start": "npm start --prefix finSight/server"
+    "start": "npm start --prefix finSight/server",
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "npm test --prefix finSight/server",
+    "test:client": "npm test --prefix finSight/client",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
   }
 }
