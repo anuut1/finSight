@@ -261,6 +261,7 @@ exports.scanReceiptEndpoint = async (req, res) => {
       success: false,
       code: err.code || err.name || 'TEXTRACT_ERROR',
       message: err.message || 'Failed to process receipt',
+      ...(err.awsRequestId ? { requestId: err.awsRequestId } : {}),
     });
   }
 };

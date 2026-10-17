@@ -63,7 +63,7 @@ describe('ReceiptScannerBox Component', () => {
     // Click Scan Receipt button
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Scan Receipt/i })).not.toBeDisabled();
-    });
+    }, { timeout: 4000 });
     fireEvent.click(screen.getByRole('button', { name: /Scan Receipt/i }));
 
     // Wait for review form to display

@@ -412,11 +412,18 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     } catch (err) {
       setScanStatus('failed');
       const backendMsg = err.response?.data?.message || err.message;
-      if (backendMsg && (backendMsg.includes('subscription required') || backendMsg.includes('SubscriptionRequiredException'))) {
-        setError(backendMsg);
-      } else {
-        setError("Couldn't read this receipt, try a clearer photo or enter it manually");
-      }
+      const code = err.response?.data?.code || err.code;
+      const requestId = err.response?.data?.requestId;
+      const ACTIONABLE = [
+        'SubscriptionRequiredException', 'AccessDeniedException', 'AccessDenied', 'UnsupportedDocumentException',
+        'DocumentTooLargeException', 'NO_ITEMS_DETECTED', 'NO_DOCUMENT_FOUND', 'UnrecognizedClientException',
+        'InvalidSignatureException', 'ExpiredTokenException', 'CredentialsProviderError', 'UnknownEndpoint',
+        'ThrottlingException', 'InvalidS3ObjectException', 'UNSUPPORTED_FILE_TYPE',
+      ];
+      const generic = "Couldn't read this receipt, try a clearer photo or enter it manually";
+      const specific = backendMsg && (ACTIONABLE.includes(code) || /subscription required/i.test(backendMsg));
+      const suffix = code ? ` (${code}${requestId ? `, ref ${requestId}` : ''})` : '';
+      setError(`${specific ? backendMsg : generic}${suffix}`);
     } finally {
       setScanning(false);
     }

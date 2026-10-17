@@ -260,4 +260,53 @@ router.get('/view-url', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/receipts/diagnose
+ * Read-only health check for the receipt pipeline: config, Textract access and S3 access.
+ * Returns booleans and error names only (no secrets). Disabled in production unless
+ * RECEIPT_DIAGNOSTICS=true.
+ */
+router.get('/diagnose', async (req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.RECEIPT_DIAGNOSTICS !== 'true') {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
+  const { TextractClient, AnalyzeExpenseCommand } = require('@aws-sdk/client-textract');
+  const { S3Client, HeadBucketCommand } = require('@aws-sdk/client-s3');
+  const { mapTextractError } = require('../services/textractService');
+  const region = process.env.AWS_REGION || 'ap-south-1';
+  const checks = {
+    config: {
+      region,
+      bucketConfigured: Boolean(bucketName),
+      staticAwsKeysSet: Boolean(process.env.AWS_ACCESS_KEY_ID),
+      geminiFallbackConfigured: Boolean(process.env.GEMINI_API_KEY),
+      nodeEnv: process.env.NODE_ENV || 'development',
+    },
+  };
+  // 1x1 transparent PNG: Textract should answer "bad document" (= reachable and authorized)
+  const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  try {
+    await new TextractClient({ region }).send(new AnalyzeExpenseCommand({ Document: { Bytes: tinyPng } }));
+    checks.textract = { ok: true, detail: 'Textract reachable and authorized.' };
+  } catch (err) {
+    const reachable = ['BadDocumentException', 'UnsupportedDocumentException', 'InvalidParameterException'].includes(err.name);
+    const mapped = mapTextractError(err);
+    checks.textract = reachable
+      ? { ok: true, detail: 'Textract reachable and authorized (rejected the 1x1 test image, as expected).' }
+      : { ok: false, errorName: err.name, message: mapped.message, hint: mapped.hint };
+  }
+  if (bucketName) {
+    try {
+      await new S3Client({ region }).send(new HeadBucketCommand({ Bucket: bucketName }));
+      checks.s3 = { ok: true, detail: 'Receipts bucket reachable.' };
+    } catch (err) {
+      checks.s3 = { ok: false, errorName: err.name, hint: 'Check the bucket name, region and s3:ListBucket/GetObject/PutObject on the instance role.' };
+    }
+  } else {
+    checks.s3 = { ok: false, hint: 'No receipts bucket configured (AWS_RECEIPTS_BUCKET).' };
+  }
+  const ok = Boolean(checks.textract?.ok) && Boolean(checks.s3?.ok);
+  return res.status(ok ? 200 : 503).json({ success: ok, checks });
+});
+
 module.exports = router;

@@ -641,38 +641,70 @@ async function analyzeReceiptExpense(input, mimeType = 'image/jpeg') {
       }
     }
 
-    let userMessage = "Couldn't read this receipt, try a clearer photo or enter it manually";
-    let statusCode = 502;
-
-    if (err.name === 'SubscriptionRequiredException') {
-      userMessage =
-        `AWS Textract subscription required. The AWS account needs an active subscription for Amazon Textract in region '${process.env.AWS_REGION || 'ap-south-1'}'.`;
-      statusCode = 400;
-    } else if (err.name === 'AccessDeniedException') {
-      userMessage = "AWS Textract access denied. The IAM user/role lacks 'textract:AnalyzeExpense' permission.";
-      statusCode = 403;
-    } else if (err.name === 'UnsupportedDocumentException') {
-      userMessage = 'Unsupported document format. AWS Textract supports JPEG, PNG, and PDF files.';
-      statusCode = 400;
-    } else if (err.name === 'BadDocumentException') {
-      userMessage = "Couldn't read this receipt, try a clearer photo or enter it manually";
-      statusCode = 400;
-    } else if (err.name === 'DocumentTooLargeException') {
-      userMessage = 'File size is too large for AWS Textract (maximum 10MB).';
-      statusCode = 400;
-    }
+    const mapped = mapTextractError(err);
+    const userMessage = mapped.message;
+    const statusCode = mapped.statusCode;
 
     const customErr = new Error(userMessage);
     customErr.name = err.name || 'TextractError';
     customErr.code = err.name;
     customErr.statusCode = statusCode;
     customErr.awsRequestId = awsRequestId;
+    customErr.hint = mapped.hint;
     throw customErr;
   }
 }
 
+
+/**
+ * Turn an AWS SDK / network error into a safe, specific message for the user plus a
+ * hint for whoever runs the deployment. Unknown errors keep the generic message.
+ */
+function mapTextractError(err) {
+  const region = process.env.AWS_REGION || 'ap-south-1';
+  const name = (err && (err.name || err.code)) || '';
+  const msg = String((err && err.message) || '');
+  const generic = "Couldn't read this receipt, try a clearer photo or enter it manually";
+
+  if (name === 'SubscriptionRequiredException') {
+    return { statusCode: 400, message: `AWS Textract subscription required in region '${region}'.`,
+      hint: 'Finish AWS account activation (billing + phone verification) or use a region where Textract AnalyzeExpense is available.' };
+  }
+  if (name === 'AccessDeniedException' || name === 'AccessDenied') {
+    return { statusCode: 403, message: "AWS Textract access denied. The role lacks 'textract:AnalyzeExpense' (or s3:GetObject for the receipt).",
+      hint: 'Add textract:AnalyzeExpense and s3:GetObject on the receipts bucket to the App Runner instance role.' };
+  }
+  if (['UnrecognizedClientException', 'InvalidSignatureException', 'ExpiredTokenException', 'InvalidClientTokenId'].includes(name) ||
+      name === 'CredentialsProviderError' || /Could not load credentials|security token/i.test(msg)) {
+    return { statusCode: 502, message: 'AWS credentials are missing, invalid or expired on the server.',
+      hint: 'Use the App Runner instance role and remove stale AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars.' };
+  }
+  if (name === 'UnknownEndpoint' || /ENOTFOUND|getaddrinfo|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN/i.test(msg)) {
+    return { statusCode: 502, message: `Could not reach AWS Textract in region '${region}'.`,
+      hint: 'Check AWS_REGION is a Textract region and that the service has outbound internet access.' };
+  }
+  if (name === 'UnsupportedDocumentException') {
+    return { statusCode: 400, message: 'Unsupported document format. AWS Textract supports JPEG, PNG, and PDF files.', hint: 'Re-encode the image as JPEG or PNG.' };
+  }
+  if (name === 'DocumentTooLargeException') {
+    return { statusCode: 400, message: 'File size is too large for AWS Textract (maximum 10MB).', hint: 'Compress the image before upload.' };
+  }
+  if (name === 'InvalidS3ObjectException') {
+    return { statusCode: 502, message: 'The uploaded receipt could not be read from S3.',
+      hint: 'Textract and the receipts bucket must be in the same region; the caller needs s3:GetObject.' };
+  }
+  if (name === 'ThrottlingException' || name === 'ProvisionedThroughputExceededException') {
+    return { statusCode: 429, message: 'The receipt scanner is busy. Please try again in a moment.', hint: 'Textract throttled the request.' };
+  }
+  if (name === 'BadDocumentException') {
+    return { statusCode: 400, message: generic, hint: 'Textract rejected the image itself (blurry, corrupt or not a document).' };
+  }
+  return { statusCode: 502, message: generic, hint: `Unmapped error '${name || 'unknown'}'. Check server logs.` };
+}
+
 module.exports = {
   analyzeReceiptExpense,
+  mapTextractError,
   inferCategoryFromMerchant,
   extractFromTextractResponse,
   normalizeAmount,
