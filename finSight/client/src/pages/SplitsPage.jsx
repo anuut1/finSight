@@ -4,6 +4,7 @@ import BalanceChip from '../components/BalanceChip.jsx';
 import Modal from '../components/Modal.jsx';
 import TripModeWidget from '../components/TripModeWidget.jsx';
 import UpiSettlementModal from '../components/UpiSettlementModal.jsx';
+import PayAndSplitModal from '../components/PayAndSplitModal.jsx';
 import Button from '../components/Button.jsx';
 import api from '../api/axios.js';
 import useAuth from '../hooks/useAuth.js';
@@ -106,6 +107,46 @@ const SplitsPage = () => {
     }
   };
 
+  const [drafts, setDrafts] = useState([]);
+  const [payAndSplitOpen, setPayAndSplitOpen] = useState(false);
+  const [draftAssignModalOpen, setDraftAssignModalOpen] = useState(false);
+  const [activeDraft, setActiveDraft] = useState(null);
+  const [draftAssignForm, setDraftAssignForm] = useState({
+    paidBy: '',
+    splitBetween: [],
+    syncPersonal: true,
+  });
+
+  const fetchDrafts = async (groupId) => {
+    if (!groupId) return;
+    try {
+      const res = await api.get(`/splits/groups/${groupId}/upi-drafts`);
+      if (res.data?.success) {
+        setDrafts(res.data.data || []);
+      }
+    } catch (e) {
+      console.warn('Could not load UPI drafts:', e.message);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedGroupId) {
+      fetchDrafts(selectedGroupId);
+    }
+  }, [selectedGroupId]);
+
+  // Handle PWA Web Share Target query parameters (?title=...&text=...&url=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedText = params.get('text') || params.get('title') || '';
+    if (sharedText && selectedGroup?._id) {
+      // Auto-open Pay & Split with the shared text
+      setPayAndSplitOpen(true);
+      // Clean query params so refreshing doesn't re-trigger
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [selectedGroup]);
+
   useEffect(() => {
     fetchGroups();
     fetchFriends();
@@ -193,6 +234,57 @@ const SplitsPage = () => {
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to leave group');
+    }
+  };
+
+  const handleOpenDraftAssign = (draft) => {
+    if (!selectedGroup) return;
+    setActiveDraft(draft);
+    const memberIds = selectedGroup.members.map((m) => m._id);
+    setDraftAssignForm({
+      paidBy: memberIds[0] || '',
+      splitBetween: memberIds,
+      syncPersonal: true,
+    });
+    setDraftAssignModalOpen(true);
+  };
+
+  const handleDismissDraft = async (draftId) => {
+    if (!selectedGroup || !window.confirm('Dismiss this draft?')) return;
+    try {
+      const res = await api.post(`/splits/groups/${selectedGroup._id}/upi-drafts/${draftId}/dismiss`);
+      if (res.data?.success) {
+        setDrafts((prev) => prev.filter((d) => d._id !== draftId));
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to dismiss draft');
+    }
+  };
+
+  const handleConfirmDraftAssign = async (e) => {
+    e.preventDefault();
+    if (!selectedGroup || !activeDraft) return;
+    setSaving(true);
+    setError('');
+    try {
+      const res = await api.post(
+        `/splits/groups/${selectedGroup._id}/upi-drafts/${activeDraft._id}/assign`,
+        {
+          mode: 'assign',
+          paidBy: draftAssignForm.paidBy,
+          splitBetween: draftAssignForm.splitBetween,
+          syncPersonal: draftAssignForm.syncPersonal,
+        }
+      );
+      if (res.data?.success) {
+        setDrafts((prev) => prev.filter((d) => d._id !== activeDraft._id));
+        if (res.data.data?.group) replaceGroup(res.data.data.group);
+        setDraftAssignModalOpen(false);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to assign draft');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -657,6 +749,74 @@ const SplitsPage = () => {
                   </div>
                 </div>
               </Card>
+
+              {/* Captured UPI Drafts (Always Draft, never auto-saved) */}
+              {drafts.length > 0 && (
+                <Card style={{ padding: '1.1rem 1.3rem', border: '1px solid rgba(16, 185, 129, 0.4)', background: 'rgba(16, 185, 129, 0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>⚡</span>
+                      <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Captured Payment Drafts ({drafts.length})
+                      </h3>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Requires review · not counted in balances until confirmed
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {drafts.map((draft) => (
+                      <div
+                        key={draft._id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.65rem 0.9rem',
+                          borderRadius: 'var(--radius-sm, 8px)',
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid var(--border-color)',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                              {draft.cleanMerchant}
+                            </span>
+                            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--accent-primary, #6366F1)' }}>
+                              ₹{Number(draft.amount).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.74rem' }}>
+                            {draft.date ? new Date(draft.date).toLocaleDateString() : 'Today'} · {draft.category || 'Shared'}
+                            {draft.payerVpa ? ` · ${draft.payerVpa}` : ''}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.45rem' }}>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleOpenDraftAssign(draft)}
+                          >
+                            Review & Split
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleDismissDraft(draft._id)}
+                          >
+                            Dismiss
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
 
               {/* Members Management Panel */}
               <Card style={{ padding: '1.1rem 1.3rem' }}>
@@ -1240,6 +1400,149 @@ const SplitsPage = () => {
             </Button>
           </form>
         </div>
+      </Modal>
+
+      {/* Pay & Split Modal for Selected Group */}
+      <PayAndSplitModal
+        isOpen={payAndSplitOpen}
+        onClose={() => setPayAndSplitOpen(false)}
+        trip={selectedGroup}
+        onDraftCreated={() => {
+          if (selectedGroup?._id) fetchDrafts(selectedGroup._id);
+        }}
+      />
+
+      {/* Draft Review & Assign Modal */}
+      <Modal
+        title={`Split ${activeDraft?.cleanMerchant || 'Draft Expense'}`}
+        isOpen={draftAssignModalOpen}
+        onClose={() => setDraftAssignModalOpen(false)}
+      >
+        {activeDraft && (
+          <form onSubmit={handleConfirmDraftAssign} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div
+              style={{
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-sm, 8px)',
+                background: 'var(--bg-surface-elevated)',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{activeDraft.cleanMerchant}</div>
+                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                  {activeDraft.category || 'Shared'} · {activeDraft.date ? new Date(activeDraft.date).toLocaleDateString() : 'Today'}
+                </div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-primary, #6366F1)' }}>
+                ₹{Number(activeDraft.amount).toLocaleString('en-IN')}
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                Paid by
+              </label>
+              <select
+                className="input-glass"
+                value={draftAssignForm.paidBy}
+                onChange={(e) => setDraftAssignForm((prev) => ({ ...prev, paidBy: e.target.value }))}
+              >
+                {selectedGroup?.members.map((member) => (
+                  <option key={member._id} value={member._id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Split between</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allIds = selectedGroup.members.map((m) => m._id);
+                    setDraftAssignForm((prev) => ({
+                      ...prev,
+                      splitBetween: prev.splitBetween.length === allIds.length ? [] : allIds,
+                    }));
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    fontSize: '0.72rem',
+                    color: 'var(--accent-primary, #6366F1)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {draftAssignForm.splitBetween.length === selectedGroup?.members.length ? 'Clear' : 'Select all'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {selectedGroup?.members.map((member) => {
+                  const on = draftAssignForm.splitBetween.includes(member._id);
+                  return (
+                    <button
+                      key={member._id}
+                      type="button"
+                      onClick={() =>
+                        setDraftAssignForm((prev) => ({
+                          ...prev,
+                          splitBetween: on
+                            ? prev.splitBetween.filter((id) => id !== member._id)
+                            : [...prev.splitBetween, member._id],
+                        }))
+                      }
+                      style={{
+                        padding: '0.3rem 0.7rem',
+                        borderRadius: '999px',
+                        fontSize: '0.78rem',
+                        border: on ? '1px solid var(--accent-primary, #6366F1)' : '1px solid var(--border-color)',
+                        background: on ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                        color: on ? 'var(--accent-primary, #6366F1)' : 'var(--text-primary)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {on ? '✓ ' : '+ '}
+                      {member.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.55rem',
+                padding: '0.65rem 0.8rem',
+                borderRadius: 18,
+                background: 'rgba(0, 212, 170, 0.08)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={draftAssignForm.syncPersonal}
+                onChange={(e) =>
+                  setDraftAssignForm((prev) => ({ ...prev, syncPersonal: e.target.checked }))
+                }
+              />
+              Add my share to personal budgets
+            </label>
+
+            <Button type="submit" variant="primary" loading={saving} fullWidth>
+              Confirm & Convert to Expense
+            </Button>
+          </form>
+        )}
       </Modal>
 
       <UpiSettlementModal

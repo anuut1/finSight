@@ -12,6 +12,7 @@ const {
   getUpiDrafts,
   createUpiDraft,
   assignUpiDraft,
+  dismissUpiDraft,
   inviteMember,
   getMyPendingInvites,
   acceptGroupInvite,
@@ -72,11 +73,19 @@ const startTripSchema = z.object({
   currency: z.string().optional(),
 });
 
-const createUpiDraftSchema = z.object({
-  amount: z.coerce.number().positive('Draft amount must be positive'),
-  rawText: z.string().optional(),
-  upiRef: z.string().optional(),
-});
+const createUpiDraftSchema = z
+  .object({
+    amount: z.coerce.number().positive('Draft amount must be positive').optional(),
+    rawText: z.string().optional(),
+    upiRef: z.string().optional(),
+    merchant: z.string().optional(),
+    category: z.string().optional(),
+    date: z.union([z.string(), z.date()]).optional(),
+    payerVpa: z.string().optional(),
+  })
+  .refine((data) => Boolean(data.amount || (data.rawText && data.rawText.trim())), {
+    message: 'Either amount or rawText is required',
+  });
 
 const inviteMemberSchema = z
   .object({
@@ -113,5 +122,6 @@ router.delete('/groups/:groupId/members/:memberId', removeMember);
 router.get('/groups/:groupId/upi-drafts', getUpiDrafts);
 router.post('/groups/:groupId/upi-drafts', validate(createUpiDraftSchema), createUpiDraft);
 router.post('/groups/:groupId/upi-drafts/:draftId/assign', assignUpiDraft);
+router.post('/groups/:groupId/upi-drafts/:draftId/dismiss', dismissUpiDraft);
 
 module.exports = router;

@@ -4,6 +4,7 @@ const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const UpiDraft = require('../models/UpiDraft');
 const { cleanAndCategorizeExpense } = require('../services/bedrockService');
+const { parseBankAlertHeuristics } = require('../services/bankAlertParser');
 const {
   findGroupWithAccess,
   canManageMembers,
@@ -1042,26 +1043,46 @@ exports.getUpiDrafts = async (req, res) => {
 exports.createUpiDraft = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { amount, rawText, upiRef } = req.body;
+    let { amount, rawText, upiRef, merchant, category, date, payerVpa } = req.body;
 
     const { group, access } = await findGroupWithAccess(groupId, req.user.id);
     if (!group) {
       return res.status(access.status).json({ success: false, message: access.message });
     }
 
-    if (!amount) {
-      return res.status(400).json({ success: false, message: 'Amount is required' });
+    // If rawText was provided and amount wasn't explicitly given or is 0, parse via heuristics
+    if (rawText && (!amount || Number(amount) <= 0)) {
+      const parsed = parseBankAlertHeuristics(rawText);
+      if (parsed.amount > 0) {
+        amount = parsed.amount;
+        if (!merchant) merchant = parsed.merchant;
+        if (!category && parsed.category) category = parsed.category;
+      }
     }
 
-    const aiCleaned = await cleanAndCategorizeExpense(rawText || `UPI payment of ${amount}`);
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid positive amount is required' });
+    }
+
+    let cleanMerchant = merchant;
+    let finalCategory = category;
+
+    if (!cleanMerchant || !finalCategory) {
+      const aiCleaned = await cleanAndCategorizeExpense(rawText || cleanMerchant || `Payment of ${amount}`);
+      if (!cleanMerchant) cleanMerchant = aiCleaned.cleanMerchant || 'Shared expense';
+      if (!finalCategory) finalCategory = aiCleaned.category || 'Shared';
+    }
 
     const draft = new UpiDraft({
+      userId: req.user.id,
       tripId: groupId,
       rawText: rawText || '',
-      cleanMerchant: aiCleaned.cleanMerchant,
+      cleanMerchant: cleanMerchant || 'Shared expense',
       amount: Number(amount) || 0,
-      category: aiCleaned.category,
+      category: finalCategory || 'Shared',
+      date: date ? new Date(date) : new Date(),
       upiRef: upiRef || '',
+      payerVpa: payerVpa || '',
       status: 'pending_assignment',
     });
 
@@ -1073,10 +1094,33 @@ exports.createUpiDraft = async (req, res) => {
   }
 };
 
+exports.dismissUpiDraft = async (req, res) => {
+  try {
+    const { groupId, draftId } = req.params;
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    const draft = await UpiDraft.findOne({ _id: draftId, tripId: groupId });
+    if (!draft) {
+      return res.status(404).json({ success: false, message: 'UPI draft not found' });
+    }
+
+    draft.status = 'dismissed';
+    await draft.save();
+
+    return res.json({ success: true, message: 'Draft dismissed', data: draft });
+  } catch (err) {
+    console.error('Error dismissing UPI draft:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.assignUpiDraft = async (req, res) => {
   try {
     const { groupId, draftId } = req.params;
-    const { mode = 'assign', splitBetween, paidBy, question } = req.body;
+    const { mode = 'assign', splitBetween, paidBy, question, syncPersonal = true, description, category } = req.body;
 
     const { group, access } = await findGroupWithAccess(groupId, req.user.id);
     if (!group) {
@@ -1086,6 +1130,12 @@ exports.assignUpiDraft = async (req, res) => {
     const draft = await UpiDraft.findOne({ _id: draftId, tripId: groupId });
     if (!draft) {
       return res.status(404).json({ success: false, message: 'UPI draft not found' });
+    }
+
+    if (mode === 'dismiss') {
+      draft.status = 'dismissed';
+      await draft.save();
+      return res.json({ success: true, message: 'Draft dismissed', data: draft });
     }
 
     if (mode === 'poll') {
@@ -1108,17 +1158,63 @@ exports.assignUpiDraft = async (req, res) => {
     const participants =
       Array.isArray(splitBetween) && splitBetween.length > 0
         ? splitBetween
-        : group.members.map((m) => m._id);
+        : group.members.map((m) => m._id.toString());
 
-    const newExpense = {
-      description: draft.cleanMerchant,
-      amount: draft.amount,
+    const expenseDesc = description || draft.cleanMerchant;
+    const expenseCat = category || draft.category || 'Shared';
+    const numericAmount = Number(draft.amount);
+    const perMemberShare = roundMoney(numericAmount / participants.length);
+    const expenseDate = draft.date || new Date();
+
+    const newExpense = group.expenses.create({
+      description: expenseDesc,
+      amount: numericAmount,
       paidBy: payerId,
       splitBetween: participants,
-      date: draft.date || new Date(),
-      category: draft.category || 'Shared',
+      date: expenseDate,
+      category: expenseCat,
+      syncPersonal,
+      personalShareAmount: perMemberShare,
       createdBy: req.user.id,
-    };
+      personalSync: [],
+    });
+
+    // Create isolated personal transaction for EACH participant linked to a user account
+    if (syncPersonal && perMemberShare > 0) {
+      for (const participantId of participants) {
+        const participantMember = group.members.id(participantId);
+        if (participantMember && participantMember.userId) {
+          try {
+            const tx = await Transaction.create({
+              userId: participantMember.userId,
+              type: 'expense',
+              category: expenseCat,
+              amount: perMemberShare,
+              description: `${expenseDesc} (${group.name} trip share)`,
+              date: expenseDate,
+              tags: ['split', group.name],
+              mood: 'neutral',
+              source: 'split',
+              splitGroupId: group._id,
+              splitExpenseId: newExpense._id,
+            });
+
+            newExpense.personalSync.push({
+              userId: participantMember.userId,
+              amount: perMemberShare,
+              transactionId: tx._id,
+            });
+
+            if (participantMember.userId.toString() === req.user.id.toString()) {
+              newExpense.personalTransactionId = tx._id;
+              newExpense.personalShareAmount = perMemberShare;
+            }
+          } catch (txErr) {
+            console.warn('[PersonalSync] Failed to create transaction for member in draft assign:', participantMember.userId, txErr.message);
+          }
+        }
+      }
+    }
 
     group.expenses.push(newExpense);
     await group.save();

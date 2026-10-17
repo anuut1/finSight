@@ -4,6 +4,7 @@ import Modal from './Modal';
 import Button from './Button';
 import TripAddExpenseModal from './TripAddExpenseModal';
 import UpiSettlementModal from './UpiSettlementModal';
+import PayAndSplitModal from './PayAndSplitModal';
 
 const CURRENCIES = [
   { code: 'INR', symbol: '₹', label: 'INR (₹)' },
@@ -38,6 +39,7 @@ const TripModeWidget = ({ onTripChanged }) => {
   // Settlement inline state
   const [settlingDebt, setSettlingDebt] = useState(null);
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [payAndSplitOpen, setPayAndSplitOpen] = useState(false);
   const [upiModalOpen, setUpiModalOpen] = useState(false);
   const [upiDebt, setUpiDebt] = useState(null);
   const [friends, setFriends] = useState([]);
@@ -323,7 +325,8 @@ Calculated via FinSight`;
 
           {/* Action buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <Button size="sm" onClick={() => setAddExpenseOpen(true)}>+ Add expense</Button>
+            <Button size="sm" variant="primary" onClick={() => setPayAndSplitOpen(true)}>⚡ Pay & Split</Button>
+            <Button size="sm" variant="secondary" onClick={() => setAddExpenseOpen(true)}>+ Add expense</Button>
             <Button size="sm" variant="secondary" onClick={() => { setEndedSummary(activeTrip); setEndModalOpen(true); }}>Settle up</Button>
             <Button size="sm" variant="danger" onClick={handleEndTrip} loading={submitting}>End trip</Button>
           </div>
@@ -733,6 +736,16 @@ Calculated via FinSight`;
         trip={activeTrip}
         symbol={sym}
         onAdded={() => { fetchActiveTrip(); if (onTripChanged) onTripChanged(activeTrip); }}
+      />
+
+      <PayAndSplitModal
+        isOpen={payAndSplitOpen}
+        onClose={() => setPayAndSplitOpen(false)}
+        trip={activeTrip}
+        onDraftCreated={() => {
+          fetchActiveTrip();
+          if (onTripChanged) onTripChanged(activeTrip);
+        }}
       />
 
       <UpiSettlementModal
