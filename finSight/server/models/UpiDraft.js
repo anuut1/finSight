@@ -20,8 +20,17 @@ const upiDraftSchema = new mongoose.Schema(
     assignedExpenseId: { type: mongoose.Schema.Types.ObjectId },
     poll: {
       question: { type: String },
-      options: [{ memberId: { type: mongoose.Schema.Types.ObjectId }, name: { type: String }, votes: { type: Number, default: 0 } }],
+      paidBy: { type: mongoose.Schema.Types.ObjectId },
+      options: [
+        {
+          memberId: { type: mongoose.Schema.Types.ObjectId },
+          name: { type: String },
+          status: { type: String, enum: ['opted_in', 'opted_out', 'pending'], default: 'pending' },
+          votedAt: { type: Date },
+        },
+      ],
       closed: { type: Boolean, default: false },
+      closedAt: { type: Date },
     },
   },
   { timestamps: true }

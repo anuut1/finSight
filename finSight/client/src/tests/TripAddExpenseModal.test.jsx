@@ -96,4 +96,62 @@ describe('TripAddExpenseModal Component', () => {
       expect(handleClose).toHaveBeenCalled();
     });
   });
+
+  it('supports Ask everyone (Poll) mode to initialize opt-in poll', async () => {
+    api.post
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { _id: 'draft123', amount: 900, cleanMerchant: 'Beach Shack' },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          message: 'Poll created for UPI draft',
+        },
+      });
+
+    const handleAdded = vi.fn();
+    const handleClose = vi.fn();
+
+    render(
+      <TripAddExpenseModal
+        isOpen={true}
+        onClose={handleClose}
+        trip={mockTrip}
+        onAdded={handleAdded}
+      />
+    );
+
+    // Switch to Poll mode
+    fireEvent.click(screen.getByRole('button', { name: /Ask everyone \(Poll\)/i }));
+
+    expect(screen.getByText(/Opt-in Poll Mode/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/What was it for/i), { target: { value: 'Beach Shack' } });
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '900' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Start Poll/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/splits/groups/trip123/upi-drafts',
+        expect.objectContaining({
+          amount: 900,
+          merchant: 'Beach Shack',
+        })
+      );
+      expect(api.post).toHaveBeenCalledWith(
+        '/splits/groups/trip123/upi-drafts/draft123/assign',
+        expect.objectContaining({
+          mode: 'poll',
+          paidBy: 'm1',
+        })
+      );
+      expect(handleAdded).toHaveBeenCalled();
+      expect(handleClose).toHaveBeenCalled();
+    });
+  });
 });
+

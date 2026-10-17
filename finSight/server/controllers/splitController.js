@@ -1139,14 +1139,21 @@ exports.assignUpiDraft = async (req, res) => {
     }
 
     if (mode === 'poll') {
+      const payerId = paidBy || group.ownerMemberId || group.members[0]?._id;
       draft.status = 'poll_created';
       draft.poll = {
-        question: question || `Who shared the payment of ₹${draft.amount} to ${draft.cleanMerchant}?`,
-        options: group.members.map((m) => ({
-          memberId: m._id,
-          name: m.name,
-          votes: 0,
-        })),
+        question: question || `Did you share the expense of ₹${draft.amount} at ${draft.cleanMerchant}?`,
+        paidBy: payerId,
+        options: group.members.map((m) => {
+          // If the member is the payer, default them to opted_in
+          const isPayer = String(m._id) === String(payerId);
+          return {
+            memberId: m._id,
+            name: m.name,
+            status: isPayer ? 'opted_in' : 'pending',
+            votedAt: isPayer ? new Date() : undefined,
+          };
+        }),
         closed: false,
       };
       await draft.save();
@@ -1236,6 +1243,181 @@ exports.assignUpiDraft = async (req, res) => {
     });
   } catch (err) {
     console.error('Error assigning UPI draft:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+/**
+ * Opt-in or opt-out of an active draft poll.
+ */
+exports.respondToDraftPoll = async (req, res) => {
+  try {
+    const { groupId, draftId } = req.params;
+    const { response, memberId } = req.body; // response: 'opt_in' | 'opt_out'
+
+    if (!['opt_in', 'opt_out'].includes(response)) {
+      return res.status(400).json({ success: false, message: 'Invalid response. Must be opt_in or opt_out' });
+    }
+
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    const draft = await UpiDraft.findOne({ _id: draftId, tripId: groupId, status: 'poll_created' });
+    if (!draft || !draft.poll || draft.poll.closed) {
+      return res.status(404).json({ success: false, message: 'Active poll not found for this draft' });
+    }
+
+    // Determine target member: either explicitly provided or inferred from req.user.id
+    let targetOption = null;
+    if (memberId) {
+      targetOption = draft.poll.options.find((o) => String(o.memberId) === String(memberId));
+    }
+    if (!targetOption) {
+      const myMember = group.members.find((m) => m.userId && String(m.userId) === String(req.user.id));
+      if (myMember) {
+        targetOption = draft.poll.options.find((o) => String(o.memberId) === String(myMember._id));
+      }
+    }
+
+    if (!targetOption) {
+      return res.status(400).json({ success: false, message: 'Member not found in poll options' });
+    }
+
+    targetOption.status = response === 'opt_in' ? 'opted_in' : 'opted_out';
+    targetOption.votedAt = new Date();
+    await draft.save();
+
+    return res.json({
+      success: true,
+      message: `Successfully ${response === 'opt_in' ? 'opted in to' : 'opted out of'} expense`,
+      data: draft,
+    });
+  } catch (err) {
+    console.error('Error responding to draft poll:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+/**
+ * Close poll and convert draft to expense among opted-in members using integer-paise math.
+ */
+exports.closeDraftPoll = async (req, res) => {
+  try {
+    const { groupId, draftId } = req.params;
+    const { syncPersonal = true, description, category } = req.body;
+
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    const draft = await UpiDraft.findOne({ _id: draftId, tripId: groupId, status: 'poll_created' });
+    if (!draft || !draft.poll || draft.poll.closed) {
+      return res.status(404).json({ success: false, message: 'Active poll not found' });
+    }
+
+    // Identify participants: members who opted in
+    const optedInMembers = draft.poll.options.filter((o) => o.status === 'opted_in');
+
+    // If nobody opted in, fall back to the payer or creator
+    const payerId = draft.poll.paidBy || group.ownerMemberId || group.members[0]?._id;
+    let participantIds = optedInMembers.map((o) => String(o.memberId));
+    if (participantIds.length === 0) {
+      participantIds = [String(payerId)];
+    }
+
+    const expenseDesc = description || draft.cleanMerchant;
+    const expenseCat = category || draft.category || 'Shared';
+    const totalAmount = Number(draft.amount);
+
+    // Integer-paise math:
+    // Convert total rupees to integer paise to eliminate floating point imprecision
+    const totalPaise = Math.round(totalAmount * 100);
+    const n = participantIds.length;
+    const basePaisePerPerson = Math.floor(totalPaise / n);
+    const remainderPaise = totalPaise % n; // Remainder paise allocated to the first remainderPaise members
+
+    const perMemberShare = roundMoney(totalAmount / n);
+    const expenseDate = draft.date || new Date();
+
+    const newExpense = group.expenses.create({
+      description: expenseDesc,
+      amount: totalAmount,
+      paidBy: payerId,
+      splitBetween: participantIds,
+      date: expenseDate,
+      category: expenseCat,
+      syncPersonal,
+      personalShareAmount: perMemberShare,
+      createdBy: req.user.id,
+      personalSync: [],
+    });
+
+    // Create isolated personal transaction for participants with integer paise share
+    if (syncPersonal) {
+      for (let idx = 0; idx < participantIds.length; idx++) {
+        const participantId = participantIds[idx];
+        const memberPaise = basePaisePerPerson + (idx < remainderPaise ? 1 : 0);
+        const memberShare = memberPaise / 100;
+
+        const participantMember = group.members.id(participantId);
+        if (participantMember && participantMember.userId && memberShare > 0) {
+          try {
+            const tx = await Transaction.create({
+              userId: participantMember.userId,
+              type: 'expense',
+              category: expenseCat,
+              amount: memberShare,
+              description: `${expenseDesc} (${group.name} poll share)`,
+              date: expenseDate,
+              tags: ['split', group.name],
+              mood: 'neutral',
+              source: 'split',
+              splitGroupId: group._id,
+              splitExpenseId: newExpense._id,
+            });
+
+            newExpense.personalSync.push({
+              userId: participantMember.userId,
+              amount: memberShare,
+              transactionId: tx._id,
+            });
+
+            if (String(participantMember.userId) === String(req.user.id)) {
+              newExpense.personalTransactionId = tx._id;
+              newExpense.personalShareAmount = memberShare;
+            }
+          } catch (txErr) {
+            console.warn('[PersonalSync] Failed to create transaction for member in close poll:', participantMember.userId, txErr.message);
+          }
+        }
+      }
+    }
+
+    group.expenses.push(newExpense);
+    await group.save();
+
+    const createdExpense = group.expenses[group.expenses.length - 1];
+
+    draft.poll.closed = true;
+    draft.poll.closedAt = new Date();
+    draft.status = 'assigned_to_expense';
+    draft.assignedExpenseId = createdExpense._id;
+    await draft.save();
+
+    return res.json({
+      success: true,
+      message: 'Poll closed and expense successfully created with integer-paise split',
+      data: {
+        draft,
+        expense: createdExpense,
+        group: serializeGroup(group, req.user.id),
+      },
+    });
+  } catch (err) {
+    console.error('Error closing draft poll:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

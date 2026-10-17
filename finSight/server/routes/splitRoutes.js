@@ -13,6 +13,8 @@ const {
   createUpiDraft,
   assignUpiDraft,
   dismissUpiDraft,
+  respondToDraftPoll,
+  closeDraftPoll,
   inviteMember,
   getMyPendingInvites,
   acceptGroupInvite,
@@ -123,5 +125,7 @@ router.get('/groups/:groupId/upi-drafts', getUpiDrafts);
 router.post('/groups/:groupId/upi-drafts', validate(createUpiDraftSchema), createUpiDraft);
 router.post('/groups/:groupId/upi-drafts/:draftId/assign', assignUpiDraft);
 router.post('/groups/:groupId/upi-drafts/:draftId/dismiss', dismissUpiDraft);
+router.post('/groups/:groupId/upi-drafts/:draftId/poll/respond', respondToDraftPoll);
+router.post('/groups/:groupId/upi-drafts/:draftId/poll/close', closeDraftPoll);
 
 module.exports = router;

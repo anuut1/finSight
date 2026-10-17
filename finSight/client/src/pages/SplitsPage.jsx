@@ -111,6 +111,7 @@ const SplitsPage = () => {
   const [payAndSplitOpen, setPayAndSplitOpen] = useState(false);
   const [draftAssignModalOpen, setDraftAssignModalOpen] = useState(false);
   const [activeDraft, setActiveDraft] = useState(null);
+  const [draftAssignMode, setDraftAssignMode] = useState('assign'); // 'assign' | 'poll'
   const [draftAssignForm, setDraftAssignForm] = useState({
     paidBy: '',
     splitBetween: [],
@@ -237,9 +238,10 @@ const SplitsPage = () => {
     }
   };
 
-  const handleOpenDraftAssign = (draft) => {
+  const handleOpenDraftAssign = (draft, initialMode = 'assign') => {
     if (!selectedGroup) return;
     setActiveDraft(draft);
+    setDraftAssignMode(initialMode);
     const memberIds = selectedGroup.members.map((m) => m._id);
     setDraftAssignForm({
       paidBy: memberIds[0] || '',
@@ -267,22 +269,79 @@ const SplitsPage = () => {
     setSaving(true);
     setError('');
     try {
-      const res = await api.post(
-        `/splits/groups/${selectedGroup._id}/upi-drafts/${activeDraft._id}/assign`,
-        {
-          mode: 'assign',
-          paidBy: draftAssignForm.paidBy,
-          splitBetween: draftAssignForm.splitBetween,
-          syncPersonal: draftAssignForm.syncPersonal,
+      if (draftAssignMode === 'poll') {
+        const res = await api.post(
+          `/splits/groups/${selectedGroup._id}/upi-drafts/${activeDraft._id}/assign`,
+          {
+            mode: 'poll',
+            paidBy: draftAssignForm.paidBy,
+            question: `Did you share the expense of ₹${activeDraft.amount} at ${activeDraft.cleanMerchant}?`,
+          }
+        );
+        if (res.data?.success) {
+          setDrafts((prev) =>
+            prev.map((d) => (d._id === activeDraft._id ? res.data.data : d))
+          );
+          setDraftAssignModalOpen(false);
         }
-      );
-      if (res.data?.success) {
-        setDrafts((prev) => prev.filter((d) => d._id !== activeDraft._id));
-        if (res.data.data?.group) replaceGroup(res.data.data.group);
-        setDraftAssignModalOpen(false);
+      } else {
+        const res = await api.post(
+          `/splits/groups/${selectedGroup._id}/upi-drafts/${activeDraft._id}/assign`,
+          {
+            mode: 'assign',
+            paidBy: draftAssignForm.paidBy,
+            splitBetween: draftAssignForm.splitBetween,
+            syncPersonal: draftAssignForm.syncPersonal,
+          }
+        );
+        if (res.data?.success) {
+          setDrafts((prev) => prev.filter((d) => d._id !== activeDraft._id));
+          if (res.data.data?.group) replaceGroup(res.data.data.group);
+          setDraftAssignModalOpen(false);
+        }
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to assign draft');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleVoteDraftPoll = async (draftId, response) => {
+    if (!selectedGroup) return;
+    setError('');
+    try {
+      const res = await api.post(`/splits/groups/${selectedGroup._id}/upi-drafts/${draftId}/poll/respond`, {
+        response,
+      });
+      if (res.data?.success) {
+        setDrafts((prev) => prev.map((d) => (d._id === draftId ? res.data.data : d)));
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit poll response');
+    }
+  };
+
+  const handleCloseDraftPoll = async (draft) => {
+    if (!selectedGroup) return;
+    const optedInCount = draft.poll?.options?.filter((o) => o.status === 'opted_in').length || 0;
+    if (optedInCount <= 1) {
+      if (!window.confirm("Nobody else joined — convert to a personal expense for the payer?")) {
+        return;
+      }
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await api.post(`/splits/groups/${selectedGroup._id}/upi-drafts/${draft._id}/poll/close`, {
+        syncPersonal: true,
+      });
+      if (res.data?.success) {
+        setDrafts((prev) => prev.filter((d) => d._id !== draft._id));
+        if (res.data.data?.group) replaceGroup(res.data.data.group);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to close poll');
     } finally {
       setSaving(false);
     }
@@ -765,55 +824,184 @@ const SplitsPage = () => {
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                    {drafts.map((draft) => (
-                      <div
-                        key={draft._id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.65rem 0.9rem',
-                          borderRadius: 'var(--radius-sm, 8px)',
-                          background: 'var(--bg-surface-elevated)',
-                          border: '1px solid var(--border-color)',
-                          flexWrap: 'wrap',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                              {draft.cleanMerchant}
-                            </span>
-                            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--accent-primary, #6366F1)' }}>
-                              ₹{Number(draft.amount).toLocaleString('en-IN')}
-                            </span>
+                    {drafts.map((draft) => {
+                      const isPoll = draft.status === 'poll_created' && draft.poll && !draft.poll.closed;
+                      if (isPoll) {
+                        const optedIn = draft.poll.options?.filter((o) => o.status === 'opted_in') || [];
+                        const countIn = optedIn.length || 1;
+                        const perPersonEstimate = (Number(draft.amount) / countIn).toFixed(2);
+
+                        return (
+                          <div
+                            key={draft._id}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.65rem',
+                              padding: '0.85rem 1rem',
+                              borderRadius: 'var(--radius-sm, 8px)',
+                              background: 'rgba(99, 102, 241, 0.06)',
+                              border: '1px solid rgba(99, 102, 241, 0.35)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--accent-primary, #6366F1)', color: '#fff' }}>
+                                    POLL IN PROGRESS
+                                  </span>
+                                  <span style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                                    {draft.cleanMerchant}
+                                  </span>
+                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary, #6366F1)' }}>
+                                    ₹{Number(draft.amount).toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                                  {draft.poll.question}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Button
+                                  type="button"
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={() => handleCloseDraftPoll(draft)}
+                                  title="Close poll and split among opted-in members with exact integer-paise math"
+                                >
+                                  Close & Split (₹{perPersonEstimate}/ea)
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDismissDraft(draft._id)}
+                                >
+                                  Dismiss
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Member vote breakdown chips */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Responses:</span>
+                              {draft.poll.options?.map((opt) => {
+                                const isIn = opt.status === 'opted_in';
+                                const isOut = opt.status === 'opted_out';
+                                const bg = isIn
+                                  ? 'rgba(16, 185, 129, 0.15)'
+                                  : isOut
+                                  ? 'rgba(239, 68, 68, 0.15)'
+                                  : 'rgba(255, 255, 255, 0.05)';
+                                const color = isIn
+                                  ? 'var(--color-positive, #10B981)'
+                                  : isOut
+                                  ? 'var(--color-negative, #EF4444)'
+                                  : 'var(--text-muted)';
+                                const icon = isIn ? '✓ ' : isOut ? '✕ ' : '⏱ ';
+                                return (
+                                  <span
+                                    key={opt.memberId}
+                                    style={{
+                                      fontSize: '0.73rem',
+                                      padding: '2px 8px',
+                                      borderRadius: '999px',
+                                      background: bg,
+                                      color: color,
+                                      border: `1px solid ${color}40`,
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {icon}{opt.name}
+                                  </span>
+                                );
+                              })}
+                            </div>
+
+                            {/* Voting buttons for current user */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                Your response:
+                              </span>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleVoteDraftPoll(draft._id, 'opt_in')}
+                              >
+                                ✓ I was part of this
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleVoteDraftPoll(draft._id, 'opt_out')}
+                              >
+                                ✕ Not me
+                              </Button>
+                            </div>
                           </div>
-                          <div className="text-muted" style={{ fontSize: '0.74rem' }}>
-                            {draft.date ? new Date(draft.date).toLocaleDateString() : 'Today'} · {draft.category || 'Shared'}
-                            {draft.payerVpa ? ` · ${draft.payerVpa}` : ''}
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={draft._id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.65rem 0.9rem',
+                            borderRadius: 'var(--radius-sm, 8px)',
+                            background: 'var(--bg-surface-elevated)',
+                            border: '1px solid var(--border-color)',
+                            flexWrap: 'wrap',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                                {draft.cleanMerchant}
+                              </span>
+                              <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--accent-primary, #6366F1)' }}>
+                                ₹{Number(draft.amount).toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                            <div className="text-muted" style={{ fontSize: '0.74rem' }}>
+                              {draft.date ? new Date(draft.date).toLocaleDateString() : 'Today'} · {draft.category || 'Shared'}
+                              {draft.payerVpa ? ` · ${draft.payerVpa}` : ''}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.45rem' }}>
+                            <Button
+                              type="button"
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleOpenDraftAssign(draft, 'assign')}
+                            >
+                              Pick people
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleOpenDraftAssign(draft, 'poll')}
+                            >
+                              Ask everyone
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDismissDraft(draft._id)}
+                            >
+                              Dismiss
+                            </Button>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.45rem' }}>
-                          <Button
-                            type="button"
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleOpenDraftAssign(draft)}
-                          >
-                            Review & Split
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleDismissDraft(draft._id)}
-                          >
-                            Dismiss
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </Card>
               )}
@@ -1048,12 +1236,12 @@ const SplitsPage = () => {
                         {[...selectedGroup.expenses].reverse().map((expense) => (
                           <tr key={expense._id}>
                             <td style={{ padding: '0.55rem 0' }}>
-                              {new Date(expense.date).toLocaleDateString()}
+                              {expense.date ? new Date(expense.date).toLocaleDateString() : 'Today'}
                             </td>
                             <td style={{ padding: '0.55rem 0' }}>{expense.description}</td>
-                            <td style={{ padding: '0.55rem 0' }}>{expense.paidByName}</td>
+                            <td style={{ padding: '0.55rem 0' }}>{expense.paidByName || 'Member'}</td>
                             <td className="text-muted" style={{ padding: '0.55rem 0' }}>
-                              {expense.splitBetweenNames.join(', ')}
+                              {(expense.splitBetweenNames || []).join(', ')}
                             </td>
                             <td style={{ padding: '0.55rem 0' }}>
                               {expense.syncPersonal && expense.personalShareAmount > 0 ? (
@@ -1420,6 +1608,44 @@ const SplitsPage = () => {
       >
         {activeDraft && (
           <form onSubmit={handleConfirmDraftAssign} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {/* Segmented Control: Pick people vs Ask everyone */}
+            <div style={{ display: 'flex', borderRadius: 'var(--radius-md, 8px)', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'var(--bg-surface-elevated)' }}>
+              <button
+                type="button"
+                onClick={() => setDraftAssignMode('assign')}
+                style={{
+                  flex: 1,
+                  padding: '7px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: draftAssignMode === 'assign' ? 'var(--accent-primary, #6366F1)' : 'transparent',
+                  color: draftAssignMode === 'assign' ? '#fff' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                👥 Pick people
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftAssignMode('poll')}
+                style={{
+                  flex: 1,
+                  padding: '7px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: draftAssignMode === 'poll' ? 'var(--accent-primary, #6366F1)' : 'transparent',
+                  color: draftAssignMode === 'poll' ? '#fff' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                📊 Ask everyone (Poll)
+              </button>
+            </div>
+
             <div
               style={{
                 padding: '0.75rem',
@@ -1459,88 +1685,118 @@ const SplitsPage = () => {
               </select>
             </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Split between</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allIds = selectedGroup.members.map((m) => m._id);
-                    setDraftAssignForm((prev) => ({
-                      ...prev,
-                      splitBetween: prev.splitBetween.length === allIds.length ? [] : allIds,
-                    }));
-                  }}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    fontSize: '0.72rem',
-                    color: 'var(--accent-primary, #6366F1)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {draftAssignForm.splitBetween.length === selectedGroup?.members.length ? 'Clear' : 'Select all'}
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                {selectedGroup?.members.map((member) => {
-                  const on = draftAssignForm.splitBetween.includes(member._id);
-                  return (
+            {draftAssignMode === 'assign' ? (
+              <>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Split between</span>
                     <button
-                      key={member._id}
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        const allIds = selectedGroup.members.map((m) => m._id);
                         setDraftAssignForm((prev) => ({
                           ...prev,
-                          splitBetween: on
-                            ? prev.splitBetween.filter((id) => id !== member._id)
-                            : [...prev.splitBetween, member._id],
-                        }))
-                      }
+                          splitBetween: prev.splitBetween.length === allIds.length ? [] : allIds,
+                        }));
+                      }}
                       style={{
-                        padding: '0.3rem 0.7rem',
-                        borderRadius: '999px',
-                        fontSize: '0.78rem',
-                        border: on ? '1px solid var(--accent-primary, #6366F1)' : '1px solid var(--border-color)',
-                        background: on ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                        color: on ? 'var(--accent-primary, #6366F1)' : 'var(--text-primary)',
+                        border: 'none',
+                        background: 'transparent',
+                        fontSize: '0.72rem',
+                        color: 'var(--accent-primary, #6366F1)',
                         cursor: 'pointer',
                       }}
                     >
-                      {on ? '✓ ' : '+ '}
-                      {member.name}
+                      {draftAssignForm.splitBetween.length === selectedGroup?.members.length ? 'Clear' : 'Select all'}
                     </button>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {selectedGroup?.members.map((member) => {
+                      const on = draftAssignForm.splitBetween.includes(member._id);
+                      return (
+                        <button
+                          key={member._id}
+                          type="button"
+                          onClick={() =>
+                            setDraftAssignForm((prev) => ({
+                              ...prev,
+                              splitBetween: on
+                                ? prev.splitBetween.filter((id) => id !== member._id)
+                                : [...prev.splitBetween, member._id],
+                            }))
+                          }
+                          style={{
+                            padding: '0.3rem 0.7rem',
+                            borderRadius: '999px',
+                            fontSize: '0.78rem',
+                            border: on ? '1px solid var(--accent-primary, #6366F1)' : '1px solid var(--border-color)',
+                            background: on ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            color: on ? 'var(--accent-primary, #6366F1)' : 'var(--text-primary)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {on ? '✓ ' : '+ '}
+                          {member.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.55rem',
-                padding: '0.65rem 0.8rem',
-                borderRadius: 18,
-                background: 'rgba(0, 212, 170, 0.08)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={draftAssignForm.syncPersonal}
-                onChange={(e) =>
-                  setDraftAssignForm((prev) => ({ ...prev, syncPersonal: e.target.checked }))
-                }
-              />
-              Add my share to personal budgets
-            </label>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.55rem',
+                    padding: '0.65rem 0.8rem',
+                    borderRadius: 18,
+                    background: 'rgba(0, 212, 170, 0.08)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={draftAssignForm.syncPersonal}
+                    onChange={(e) =>
+                      setDraftAssignForm((prev) => ({ ...prev, syncPersonal: e.target.checked }))
+                    }
+                  />
+                  Add my share to personal budgets
+                </label>
 
-            <Button type="submit" variant="primary" loading={saving} fullWidth>
-              Confirm & Convert to Expense
-            </Button>
+                <Button type="submit" variant="primary" loading={saving} fullWidth>
+                  Confirm & Convert to Expense
+                </Button>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    padding: '0.85rem 1rem',
+                    borderRadius: 'var(--radius-md, 8px)',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1px solid rgba(99, 102, 241, 0.25)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary, #6366F1)' }}>
+                    📊 Opt-in Poll Mode
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                    Everyone in the group will be polled to answer <strong>"I was part of this"</strong> or <strong>"Not me"</strong>.
+                    When closed, the expense will be divided down to the exact integer paise among confirmed participants.
+                  </div>
+                </div>
+
+                <Button type="submit" variant="primary" loading={saving} fullWidth>
+                  Start Poll for Everyone
+                </Button>
+              </>
+            )}
           </form>
         )}
       </Modal>

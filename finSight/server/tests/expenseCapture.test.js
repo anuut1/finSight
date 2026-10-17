@@ -183,4 +183,126 @@ describe('Phase 3: Fast Expense Capture from Payment Apps in Trip Mode', () => {
     expect(groupAfter.expenses.length).toBe(1);
     expect(groupAfter.expenses[0].amount).toBe(600);
   });
+
+  it('supports Opt-In poll ("Ask everyone"): creation, member opt-in/opt-out, and integer-paise closing', async () => {
+    const group = await SplitGroup.findById(activeTripId);
+    const aliceMemberId = group.members.find((m) => m.userId?.toString() === userId.toString())._id;
+    const bobMemberId = group.members.find((m) => m.userId?.toString() === otherUserId.toString())._id;
+
+    // Create draft of ₹100.00 (split across 3 participants or tested with integer paise remainder)
+    const draftRes = await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        amount: 100,
+        merchant: 'TukTuk Ride',
+      });
+    const draftId = draftRes.body.data._id;
+
+    // 1. Create poll
+    const pollCreateRes = await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts/${draftId}/assign`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        mode: 'poll',
+        paidBy: aliceMemberId.toString(),
+        question: 'Did you share the TukTuk Ride?',
+      });
+
+    expect(pollCreateRes.status).toBe(200);
+    expect(pollCreateRes.body.data.status).toBe('poll_created');
+    expect(pollCreateRes.body.data.poll.options.length).toBe(2);
+
+    // Alice (payer) defaults to opted_in, Bob defaults to pending
+    const bobOption = pollCreateRes.body.data.poll.options.find((o) => String(o.memberId) === String(bobMemberId));
+    expect(bobOption.status).toBe('pending');
+
+    // 2. Bob opts in
+    const bobVoteRes = await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts/${draftId}/poll/respond`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({
+        response: 'opt_in',
+      });
+
+    expect(bobVoteRes.status).toBe(200);
+    const updatedBobOption = bobVoteRes.body.data.poll.options.find((o) => String(o.memberId) === String(bobMemberId));
+    expect(updatedBobOption.status).toBe('opted_in');
+
+    // 3. Close the poll and verify integer-paise division (10000 paise / 2 = 5000 paise each = ₹50.00)
+    const closeRes = await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts/${draftId}/poll/close`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        syncPersonal: true,
+      });
+
+    expect(closeRes.status).toBe(200);
+    expect(closeRes.body.success).toBe(true);
+    expect(closeRes.body.data.draft.status).toBe('assigned_to_expense');
+    expect(closeRes.body.data.draft.poll.closed).toBe(true);
+    expect(closeRes.body.data.expense.splitBetween.length).toBe(2);
+    expect(closeRes.body.data.expense.amount).toBe(100);
+  });
+
+  it('handles remainder paise accurately with integer-paise arithmetic', async () => {
+    // Add a third member to active trip to test 100 / 3 = 33.34, 33.33, 33.33
+    const group = await SplitGroup.findById(activeTripId);
+    group.members.push({
+      name: 'Charlie',
+      email: 'charlie@example.com',
+      status: 'active',
+    });
+    await group.save();
+
+    const charlieMemberId = group.members[group.members.length - 1]._id;
+    const aliceMemberId = group.members[0]._id;
+    const bobMemberId = group.members[1]._id;
+
+    // Create draft of ₹100.00
+    const draftRes = await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        amount: 100,
+        merchant: 'Beach Cafe Snacks',
+      });
+    const draftId = draftRes.body.data._id;
+
+    // Create poll
+    await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts/${draftId}/assign`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        mode: 'poll',
+        paidBy: aliceMemberId.toString(),
+      });
+
+    // Bob opts in
+    await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts/${draftId}/poll/respond`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({
+        response: 'opt_in',
+      });
+
+    // Charlie opts in (simulated by Alice host)
+    await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts/${draftId}/poll/respond`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        response: 'opt_in',
+        memberId: charlieMemberId.toString(),
+      });
+
+    // Close poll with 3 opted-in members
+    const closeRes = await request(app)
+      .post(`/api/splits/groups/${activeTripId}/upi-drafts/${draftId}/poll/close`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ syncPersonal: true });
+
+    expect(closeRes.status).toBe(200);
+    expect(closeRes.body.data.expense.splitBetween.length).toBe(3);
+    expect(closeRes.body.data.expense.amount).toBe(100);
+  });
 });
