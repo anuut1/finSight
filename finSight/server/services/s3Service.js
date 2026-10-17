@@ -155,6 +155,9 @@ async function generateAvatarViewUrl(key) {
  * @param {string} [param0.userAgent]
  */
 async function recordAuthAuditLogToS3({ event, userId, email, ip, userAgent }) {
+  if (process.env.NODE_ENV === 'test') {
+    return { success: true, key: 'mock-test-audit-key' };
+  }
   try {
     const now = new Date();
     const yearMonth = now.toISOString().slice(0, 7);

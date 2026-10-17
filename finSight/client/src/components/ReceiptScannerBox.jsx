@@ -391,7 +391,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
           amount: Math.round((total + Number.EPSILON) * 100) / 100,
           category: scanResult.category || 'Food & Dining',
           date: scanResult.date || new Date().toISOString().slice(0, 10),
-          description: scanResult.vendor || scanResult.merchant || 'Receipt Expense',
+          description: scanResult.vendor || scanResult.merchant || scanResult.merchantName || 'Receipt Expense',
           lineItems: rawItems,
           items: rawItems,
           subtotal: Math.round((subtotal + Number.EPSILON) * 100) / 100,
@@ -642,6 +642,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
             ref={fileInputRef}
             onChange={handleFileChange}
             accept="image/jpeg,image/png,image/jpg,application/pdf,image/heic,image/heif"
+            aria-label="Upload receipt document"
             style={{ display: 'none' }}
           />
 
