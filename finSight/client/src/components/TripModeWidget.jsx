@@ -40,6 +40,7 @@ const TripModeWidget = ({ onTripChanged }) => {
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [upiModalOpen, setUpiModalOpen] = useState(false);
   const [upiDebt, setUpiDebt] = useState(null);
+  const [friends, setFriends] = useState([]);
 
   const fetchActiveTrip = async () => {
     try {
@@ -54,9 +55,37 @@ const TripModeWidget = ({ onTripChanged }) => {
     }
   };
 
+  const fetchFriends = async () => {
+    try {
+      const res = await api.get('/friends');
+      if (res.data?.success) {
+        setFriends(res.data.data || []);
+      }
+    } catch (err) {
+      console.warn('Could not load friends:', err.message);
+    }
+  };
+
   useEffect(() => {
     fetchActiveTrip();
+    fetchFriends();
   }, []);
+
+  const toggleFriendInTrip = (friend) => {
+    const currentNames = membersInput
+      .split(/,|\n/)
+      .map((m) => m.trim())
+      .filter(Boolean);
+    const existsIndex = currentNames.findIndex(
+      (m) => m.toLowerCase() === friend.name.toLowerCase()
+    );
+    if (existsIndex >= 0) {
+      currentNames.splice(existsIndex, 1);
+    } else {
+      currentNames.push(friend.name);
+    }
+    setMembersInput(currentNames.join(', '));
+  };
 
   const handleStartTrip = async (e) => {
     e.preventDefault();
@@ -79,7 +108,16 @@ const TripModeWidget = ({ onTripChanged }) => {
     setError('');
 
     try {
-      const membersPayload = rawMembers.map((name) => ({ name }));
+      const membersPayload = rawMembers.map((name) => {
+        const matched = friends.find(
+          (f) => f.name.toLowerCase() === name.toLowerCase()
+        );
+        return {
+          name,
+          email: matched?.email || undefined,
+          userId: matched?.userId || undefined,
+        };
+      });
       const res = await api.post('/splits/trips/start', {
         name: tripName.trim(),
         currency,
@@ -396,6 +434,44 @@ Calculated via FinSight`;
                   value={membersInput}
                   onChange={(e) => setMembersInput(e.target.value)}
                 />
+                {friends.length > 0 && (
+                  <div style={{ marginTop: '0.35rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      One-tap add:
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.2rem' }}>
+                      {friends.map((friend) => {
+                        const isSelected = membersInput
+                          .split(/,|\n/)
+                          .map((m) => m.trim().toLowerCase())
+                          .includes(friend.name.toLowerCase());
+                        return (
+                          <button
+                            key={friend.userId}
+                            type="button"
+                            onClick={() => toggleFriendInTrip(friend)}
+                            style={{
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '999px',
+                              fontSize: '0.72rem',
+                              border: isSelected
+                                ? '1px solid var(--accent-primary, #6366F1)'
+                                : '1px solid var(--border-color)',
+                              background: isSelected
+                                ? 'rgba(99, 102, 241, 0.15)'
+                                : 'rgba(255, 255, 255, 0.05)',
+                              color: isSelected ? 'var(--accent-primary, #6366F1)' : 'var(--text-primary)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {isSelected ? '✓ ' : '+ '}
+                            {friend.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

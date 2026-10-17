@@ -24,6 +24,7 @@ const createGroupSchema = z.object({
       z.object({
         name: z.string().trim().min(1, 'Member name is required'),
         email: z.string().trim().optional(),
+        userId: z.string().optional(),
       })
     )
     .optional(),
@@ -58,6 +59,7 @@ const startTripSchema = z.object({
       z.object({
         name: z.string().trim().min(1, 'Member name is required'),
         email: z.string().trim().optional(),
+        userId: z.string().optional(),
       })
     )
     .optional(),

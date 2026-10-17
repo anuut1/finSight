@@ -50,6 +50,7 @@ const SplitsPage = () => {
   const [settlementForm, setSettlementForm] = useState(emptySettlementForm);
   const [upiModalOpen, setUpiModalOpen] = useState(false);
   const [upiDebt, setUpiDebt] = useState(null);
+  const [friends, setFriends] = useState([]);
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group._id === selectedGroupId) || groups[0],
@@ -62,6 +63,15 @@ const SplitsPage = () => {
     const userLine = `${user.name || 'You'}${user.email ? `, ${user.email}` : ''}`;
     setGroupForm((prev) => ({ ...prev, members: `${userLine}\nFriend` }));
   }, [groupForm.members, user]);
+
+  const fetchFriends = async () => {
+    try {
+      const res = await api.get('/friends');
+      if (res.data?.success) setFriends(res.data.data || []);
+    } catch (e) {
+      console.warn('Could not load friends:', e.message);
+    }
+  };
 
   const fetchGroups = async () => {
     setLoading(true);
@@ -81,7 +91,26 @@ const SplitsPage = () => {
 
   useEffect(() => {
     fetchGroups();
+    fetchFriends();
   }, []);
+
+  const toggleFriendInGroup = (friend) => {
+    const friendEntry = `${friend.name}, ${friend.email || ''}`.replace(/,\s*$/, '');
+    const currentLines = groupForm.members.split('\n').map((l) => l.trim()).filter(Boolean);
+    const existsIndex = currentLines.findIndex(
+      (l) =>
+        l.toLowerCase() === friendEntry.toLowerCase() ||
+        (friend.email && l.toLowerCase().includes(friend.email.toLowerCase())) ||
+        l.toLowerCase() === friend.name.toLowerCase()
+    );
+
+    if (existsIndex >= 0) {
+      currentLines.splice(existsIndex, 1);
+    } else {
+      currentLines.push(friendEntry);
+    }
+    setGroupForm((prev) => ({ ...prev, members: currentLines.join('\n') }));
+  };
 
   const replaceGroup = (updatedGroup) => {
     setGroups((prev) => prev.map((group) => (group._id === updatedGroup._id ? updatedGroup : group)));
@@ -96,7 +125,18 @@ const SplitsPage = () => {
         .split('\n')
         .map((line) => {
           const [name, email = ''] = line.split(',');
-          return { name: name.trim(), email: email.trim() };
+          const cleanName = name.trim();
+          const cleanEmail = email.trim();
+          const matched = friends.find(
+            (f) =>
+              (cleanEmail && f.email?.toLowerCase() === cleanEmail.toLowerCase()) ||
+              (f.name && f.name.toLowerCase() === cleanName.toLowerCase())
+          );
+          return {
+            name: cleanName,
+            email: cleanEmail,
+            userId: matched?.userId || undefined,
+          };
         })
         .filter((member) => member.name);
 
@@ -603,6 +643,42 @@ const SplitsPage = () => {
               rows={5}
               style={{ borderRadius: 18, resize: 'vertical' }}
             />
+            {friends.length > 0 && (
+              <div style={{ marginTop: '0.4rem' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  One-tap add from friends:
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.3rem' }}>
+                  {friends.map((friend) => {
+                    const isSelected = groupForm.members.toLowerCase().includes(friend.name.toLowerCase());
+                    return (
+                      <button
+                        key={friend.userId}
+                        type="button"
+                        onClick={() => toggleFriendInGroup(friend)}
+                        style={{
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '999px',
+                          fontSize: '0.75rem',
+                          border: isSelected
+                            ? '1px solid var(--accent-primary, #6366F1)'
+                            : '1px solid var(--border-color)',
+                          background: isSelected
+                            ? 'rgba(99, 102, 241, 0.15)'
+                            : 'rgba(255, 255, 255, 0.05)',
+                          color: isSelected ? 'var(--accent-primary, #6366F1)' : 'var(--text-primary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {isSelected ? '✓ ' : '+ '}
+                        {friend.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <Button type="submit" variant="primary" loading={saving} fullWidth>
             Create group

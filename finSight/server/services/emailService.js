@@ -127,7 +127,65 @@ async function sendWelcomeEmailViaSes({ toEmail, userName }) {
   });
 }
 
+/**
+ * Send an invitation email to a friend who is not yet on FinSight
+ */
+async function sendFriendInviteEmailViaSes({ toEmail, inviterName, inviterCode }) {
+  const appUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const registerUrl = inviterCode
+    ? `${appUrl}/register?friendCode=${encodeURIComponent(inviterCode)}&email=${encodeURIComponent(toEmail)}`
+    : `${appUrl}/register`;
+  const subject = `${inviterName || 'A friend'} invited you to connect on FinSight 🤝`;
+  const textBody = `Hi,\n\n${inviterName || 'A friend'} invited you to connect on FinSight to split expenses, track trips, and manage shared finances together.\n\nJoin here:\n${registerUrl}\n\nBest regards,\nThe FinSight Team`;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Connect on FinSight</title>
+</head>
+<body style="background-color: #0B1120; color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; margin: 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #1E293B; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
+    <tr>
+      <td style="padding: 32px 32px 20px 32px; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); text-align: center;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700;">FinSight</h1>
+        <p style="margin: 8px 0 0 0; color: #E0E7FF; font-size: 14px;">Smart Financial & Expense Collaboration</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 32px;">
+        <h2 style="margin: 0 0 16px 0; color: #F8FAFC; font-size: 20px;">${inviterName || 'A friend'} wants to connect with you! 🤝</h2>
+        <p style="color: #94A3B8; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+          ${inviterName || 'Your friend'} uses FinSight to track trip spending, split bills, and settle debts easily. Connect with them to collaborate on shared expenses.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${registerUrl}" style="background-color: #6366F1; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+            Join FinSight & Connect
+          </a>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 20px 32px; background-color: #0F172A; text-align: center; font-size: 12px; color: #64748B;">
+        Sent securely via Amazon Simple Email Service (SES).
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  return sendTransactionalEmailViaSes({
+    toEmail,
+    subject,
+    htmlBody,
+    textBody,
+  });
+}
+
 module.exports = {
   sendTransactionalEmailViaSes,
   sendWelcomeEmailViaSes,
+  sendFriendInviteEmailViaSes,
 };

@@ -139,6 +139,7 @@ exports.createGroup = async (req, res) => {
       .map((member) => ({
         name: String(member.name || '').trim(),
         email: String(member.email || '').trim(),
+        userId: member.userId || undefined,
       }))
       .filter((member) => member.name);
 
@@ -153,9 +154,18 @@ exports.createGroup = async (req, res) => {
       cleanMembers[matchingUserIndex] = {
         name: user?.name || cleanMembers[matchingUserIndex].name,
         email: user?.email || cleanMembers[matchingUserIndex].email,
+        userId: req.user.id,
+        role: 'owner',
+        status: 'active',
       };
     } else if (user) {
-      cleanMembers.unshift({ name: user.name, email: user.email });
+      cleanMembers.unshift({
+        name: user.name,
+        email: user.email,
+        userId: req.user.id,
+        role: 'owner',
+        status: 'active',
+      });
     }
 
     if (cleanMembers.length < 2) {
@@ -393,6 +403,7 @@ exports.startTrip = async (req, res) => {
       .map((member) => ({
         name: String(member.name || '').trim(),
         email: String(member.email || '').trim(),
+        userId: member.userId || undefined,
       }))
       .filter((member) => member.name);
 
@@ -407,9 +418,18 @@ exports.startTrip = async (req, res) => {
       cleanMembers[matchingUserIndex] = {
         name: user?.name || cleanMembers[matchingUserIndex].name,
         email: user?.email || cleanMembers[matchingUserIndex].email,
+        userId: req.user.id,
+        role: 'owner',
+        status: 'active',
       };
     } else if (user) {
-      cleanMembers.unshift({ name: user.name, email: user.email });
+      cleanMembers.unshift({
+        name: user.name,
+        email: user.email,
+        userId: req.user.id,
+        role: 'owner',
+        status: 'active',
+      });
     }
 
     if (cleanMembers.length < 2) {

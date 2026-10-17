@@ -14,6 +14,7 @@ const BillsPage = lazy(() => import('./pages/BillsPage.jsx'));
 const GoalsPage = lazy(() => import('./pages/GoalsPage.jsx'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage.jsx'));
 const SplitsPage = lazy(() => import('./pages/SplitsPage.jsx'));
+const FriendsPage = lazy(() => import('./pages/FriendsPage.jsx'));
 
 const PageLoader = () => (
   <div
@@ -101,6 +102,14 @@ function App() {
                 element={
                   <Layout>
                     <SplitsPage />
+                  </Layout>
+                }
+              />
+              <Route
+                path="/friends"
+                element={
+                  <Layout>
+                    <FriendsPage />
                   </Layout>
                 }
               />

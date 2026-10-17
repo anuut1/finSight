@@ -15,6 +15,7 @@ const navItems = [
   { to: '/budgets', label: 'Budgets' },
   { to: '/goals', label: 'Goals' },
   { to: '/splits', label: 'Splits & trips' },
+  { to: '/friends', label: 'Friends' },
   { to: '/analytics', label: 'Insights' },
 ];
 
