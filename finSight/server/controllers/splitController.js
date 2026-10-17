@@ -30,22 +30,28 @@ const getOwnerMemberId = (group) => {
 };
 
 const calculateBalances = (group) => {
-  const balances = {};
+  const balancesPaise = {};
 
   group.members.forEach((member) => {
-    balances[member._id.toString()] = 0;
+    balancesPaise[member._id.toString()] = 0;
   });
 
   group.expenses.forEach((expense) => {
     const paidBy = expense.paidBy.toString();
     const participants = expense.splitBetween.map((id) => id.toString());
-    if (!participants.length || balances[paidBy] === undefined) return;
+    if (!participants.length || balancesPaise[paidBy] === undefined) return;
 
-    balances[paidBy] += expense.amount;
-    const share = expense.amount / participants.length;
-    participants.forEach((memberId) => {
-      if (balances[memberId] !== undefined) {
-        balances[memberId] -= share;
+    const totalPaise = Math.round(Number(expense.amount) * 100);
+    balancesPaise[paidBy] += totalPaise;
+
+    const n = participants.length;
+    const basePaise = Math.floor(totalPaise / n);
+    const remainderPaise = totalPaise % n;
+
+    participants.forEach((memberId, idx) => {
+      if (balancesPaise[memberId] !== undefined) {
+        const sharePaise = basePaise + (idx < remainderPaise ? 1 : 0);
+        balancesPaise[memberId] -= sharePaise;
       }
     });
   });
@@ -53,13 +59,15 @@ const calculateBalances = (group) => {
   group.settlements.forEach((settlement) => {
     const from = settlement.from.toString();
     const to = settlement.to.toString();
+    const settlementPaise = Math.round(Number(settlement.amount) * 100);
 
-    if (balances[from] !== undefined) balances[from] += settlement.amount;
-    if (balances[to] !== undefined) balances[to] -= settlement.amount;
+    if (balancesPaise[from] !== undefined) balancesPaise[from] += settlementPaise;
+    if (balancesPaise[to] !== undefined) balancesPaise[to] -= settlementPaise;
   });
 
   const memberBalances = group.members.map((member) => {
     const memberId = member._id.toString();
+    const paise = balancesPaise[memberId] || 0;
     return {
       memberId,
       name: member.name,
@@ -67,40 +75,40 @@ const calculateBalances = (group) => {
       userId: member.userId,
       role: member.role || 'member',
       status: member.status || 'active',
-      balance: roundMoney(balances[memberId] || 0),
+      balance: paise / 100,
     };
   });
 
   const creditors = memberBalances
     .filter((member) => member.balance > 0)
-    .map((member) => ({ ...member }))
-    .sort((a, b) => b.balance - a.balance);
+    .map((member) => ({ ...member, balancePaise: Math.round(member.balance * 100) }))
+    .sort((a, b) => b.balancePaise - a.balancePaise);
   const debtors = memberBalances
     .filter((member) => member.balance < 0)
-    .map((member) => ({ ...member, balance: Math.abs(member.balance) }))
-    .sort((a, b) => b.balance - a.balance);
+    .map((member) => ({ ...member, balancePaise: Math.round(Math.abs(member.balance) * 100) }))
+    .sort((a, b) => b.balancePaise - a.balancePaise);
 
   const simplifiedDebts = [];
   let i = 0;
   let j = 0;
 
   while (i < debtors.length && j < creditors.length) {
-    const amount = roundMoney(Math.min(debtors[i].balance, creditors[j].balance));
-    if (amount > 0) {
+    const settlePaise = Math.min(debtors[i].balancePaise, creditors[j].balancePaise);
+    if (settlePaise > 0) {
       simplifiedDebts.push({
         from: debtors[i].memberId,
         fromName: debtors[i].name,
         to: creditors[j].memberId,
         toName: creditors[j].name,
-        amount,
+        amount: settlePaise / 100,
       });
     }
 
-    debtors[i].balance = roundMoney(debtors[i].balance - amount);
-    creditors[j].balance = roundMoney(creditors[j].balance - amount);
+    debtors[i].balancePaise -= settlePaise;
+    creditors[j].balancePaise -= settlePaise;
 
-    if (debtors[i].balance <= 0.01) i += 1;
-    if (creditors[j].balance <= 0.01) j += 1;
+    if (debtors[i].balancePaise === 0) i += 1;
+    if (creditors[j].balancePaise === 0) j += 1;
   }
 
   return { memberBalances, simplifiedDebts };
