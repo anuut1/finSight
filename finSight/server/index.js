@@ -20,11 +20,39 @@ const { authMiddleware } = require('./middleware/authMiddleware');
 const helmet = require('helmet');
 const { requestLoggingMiddleware, logger } = require('./utils/logger');
 
+// Fail fast on missing JWT_SECRET
+if (!process.env.JWT_SECRET) {
+  logger.error('FATAL: JWT_SECRET environment variable is missing.');
+  if (process.env.NODE_ENV !== 'test') {
+    process.exit(1);
+  }
+}
+
+const isProd = process.env.NODE_ENV === 'production';
+
+// Production configuration audit & warnings
+if (isProd) {
+  const missingProdVars = [];
+  if (!process.env.MONGO_URI) missingProdVars.push('MONGO_URI');
+  if (!process.env.CLIENT_URL) missingProdVars.push('CLIENT_URL');
+  if (!process.env.AWS_RECEIPTS_BUCKET) missingProdVars.push('AWS_RECEIPTS_BUCKET');
+  if (!process.env.AWS_REGION) missingProdVars.push('AWS_REGION');
+  if (!process.env.AWS_SES_FROM_EMAIL) missingProdVars.push('AWS_SES_FROM_EMAIL');
+  if (!process.env.REMINDER_SECRET_KEY) missingProdVars.push('REMINDER_SECRET_KEY');
+
+  if (missingProdVars.length > 0) {
+    logger.warn({ missingProdVars }, `[Config Warning] Missing recommended production environment variables: ${missingProdVars.join(', ')}`);
+  }
+}
+
 const app = express();
 
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/finsight';
-const isProd = process.env.NODE_ENV === 'production';
+const MONGO_URI = process.env.MONGO_URI || (isProd ? null : 'mongodb://localhost:27017/finsight');
+if (isProd && !MONGO_URI) {
+  logger.error('FATAL: MONGO_URI must be provided in production.');
+  process.exit(1);
+}
 
 // Security Headers via Helmet
 app.use(

@@ -15,6 +15,86 @@ const CATEGORIES = [
   'Other',
 ];
 
+/**
+ * Re-encode any selected image file to JPEG via canvas.
+ * - Caps max dimension on the long side to ~2000px
+ * - Preserves EXIF orientation where modern browser decodes it
+ * - JPEG quality ~0.85
+ * - Converts HEIC/HEIF or other formats if browser decodes it, or fails clearly
+ */
+const reencodeImageToJpeg = (file) => {
+  return new Promise((resolve, reject) => {
+    // If it's a PDF, Textract natively supports PDF documents up to 10MB
+    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+      return resolve(file);
+    }
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (!width || !height) {
+          return reject(new Error("Couldn't read this receipt, try a clearer photo or enter it manually"));
+        }
+
+        const maxDimension = 2000;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // Draw white background in case of transparent PNG/WebP
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              return reject(new Error("Couldn't read this receipt, try a clearer photo or enter it manually"));
+            }
+            const cleanFileName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+            const convertedFile = new File([blob], cleanFileName, { type: 'image/jpeg' });
+            resolve(convertedFile);
+          },
+          'image/jpeg',
+          0.85
+        );
+      } catch {
+        reject(new Error("Couldn't read this receipt, try a clearer photo or enter it manually"));
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(
+        new Error(
+          file.name.match(/\.(heic|heif)$/i)
+            ? "Your browser could not decode this iPhone HEIC photo. Please take a photo as JPEG/PNG or convert it before uploading."
+            : "Couldn't read this receipt, try a clearer photo or enter it manually"
+        )
+      );
+    };
+
+    img.src = objectUrl;
+  });
+};
+
 const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = null }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -25,44 +105,40 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [scanMode, setScanMode] = useState('auto'); // 'auto' (S3 async pipeline with fallback) | 'direct' (direct multipart sync)
+  const [scanMode, setScanMode] = useState('auto'); // 'auto' (S3 pipeline with fallback) | 'direct' (direct multipart sync)
   const fileInputRef = useRef(null);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
 
-    const mime = (selected.type || '').toLowerCase();
-    const validMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'image/heic', 'image/heif'];
-
-    if (mime === 'image/webp') {
-      setError('WebP format is not supported by AWS Textract. Please upload a JPEG, PNG, or PDF file.');
-      return;
-    }
-
-    if (mime === 'image/heic' || mime === 'image/heif' || selected.name.match(/\.(heic|heif)$/i)) {
-      setError('Unsupported format: iPhone HEIC photos are not directly supported by AWS Textract. Please convert your photo to JPEG or PNG before uploading.');
-      return;
-    }
-
-    if (!validMimes.includes(mime) && !selected.name.match(/\.(jpg|jpeg|png|pdf)$/i)) {
-      setError('Please select a supported file format (JPEG, PNG, or PDF up to 10MB).');
-      return;
-    }
-
-    if (selected.size > 10 * 1024 * 1024) {
-      setError('File size must be under 10MB (AWS Textract limit).');
-      return;
-    }
-
     setError('');
-    setFile(selected);
-    const url = URL.createObjectURL(selected);
-    setPreviewUrl(url);
-    setDraft(null);
-    setSuccess(false);
-    setScanStatus('idle');
-    setUploadProgress(0);
+
+    // Pre-check file size cap
+    if (selected.size > 15 * 1024 * 1024) {
+      setError('File size must be under 15MB. Please choose a smaller file.');
+      return;
+    }
+
+    try {
+      // Re-encode image to JPEG (max 2000px, 0.85 quality) to ensure AWS Textract compatibility
+      const processedFile = await reencodeImageToJpeg(selected);
+
+      if (processedFile.size > 10 * 1024 * 1024) {
+        setError('Processed file exceeds the 10MB limit for AWS Textract. Please take a closer photo.');
+        return;
+      }
+
+      setFile(processedFile);
+      const url = URL.createObjectURL(processedFile);
+      setPreviewUrl(url);
+      setDraft(null);
+      setSuccess(false);
+      setScanStatus('idle');
+      setUploadProgress(0);
+    } catch (procErr) {
+      setError(procErr.message || "Couldn't read this receipt, try a clearer photo or enter it manually");
+    }
   };
 
   const handleDrop = (e) => {
@@ -111,7 +187,6 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     ctx.textAlign = 'right';
     ctx.fillText('₹45.00', 370, 235);
 
-    ctx.textAlign = 'center';
     ctx.fillText('-----------------------------------', 200, 260);
 
     ctx.textAlign = 'left';
@@ -137,11 +212,11 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
 
     canvas.toBlob((blob) => {
       if (blob) {
-        const sampleFile = new File([blob], 'sample-starbucks-receipt.png', { type: 'image/png' });
+        const sampleFile = new File([blob], 'sample-starbucks-receipt.jpg', { type: 'image/jpeg' });
         const syntheticEvent = { target: { files: [sampleFile] } };
         handleFileChange(syntheticEvent);
       }
-    }, 'image/png');
+    }, 'image/jpeg', 0.9);
   };
 
   /**
@@ -177,24 +252,24 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
   /**
    * Polls GET /api/receipts/:id until status is 'completed' or 'failed'
    */
-  const pollReceiptStatus = async (receiptId, maxAttempts = 25) => {
+  const pollReceiptStatus = async (receiptId, maxAttempts = 22) => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise((res) => setTimeout(res, 1500));
       try {
         const res = await api.get(`/receipts/${receiptId}`);
-        const data = res.data?.data;
+        const data = res.data?.data || res.data;
         if (!data) continue;
 
         if (data.status === 'completed') {
           return {
             ...data.result,
             receiptUrl: data.receiptUrl,
-            receiptId: data.receiptId,
+            receiptId: data.receiptId || receiptId,
           };
         }
 
         if (data.status === 'failed') {
-          const err = new Error(data.error?.message || 'Receipt processing failed.');
+          const err = new Error(data.error?.message || "Couldn't read this receipt, try a clearer photo or enter it manually");
           err.code = data.error?.code;
           throw err;
         }
@@ -221,7 +296,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     try {
       let scanResult = null;
 
-      // 1. If scanMode === 'auto', try modern S3 Async Pipeline with automatic fallback
+      // 1. S3 Direct Upload Pipeline
       if (scanMode === 'auto') {
         try {
           const presignRes = await api.post('/receipts/upload-url', {
@@ -230,23 +305,24 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
             tripId: tripId || undefined,
           });
 
-          const uploadData = presignRes.data?.data || presignRes.data;
-          const uploadUrl = uploadData?.uploadUrl;
-          const receiptId = uploadData?.receiptId;
-          const key = uploadData?.key;
-          const bucket = uploadData?.bucket;
+          // Read fields robustly at both root and nested data levels
+          const payload = presignRes.data?.data || presignRes.data || {};
+          const uploadUrl = payload.uploadUrl || presignRes.data?.uploadUrl;
+          const receiptId = payload.receiptId || presignRes.data?.receiptId;
+          const key = payload.key || presignRes.data?.key;
+          const bucket = payload.bucket || presignRes.data?.bucket;
 
           if (uploadUrl && key) {
             // Direct browser-to-S3 upload with live progress tracking
             await uploadToS3WithProgress(uploadUrl, file);
             setScanStatus('processing');
 
-            // Poll asynchronous Lambda Textract worker (up to ~35s)
+            // Check if asynchronous worker produced result
             if (receiptId) {
-              scanResult = await pollReceiptStatus(receiptId, 22);
+              scanResult = await pollReceiptStatus(receiptId, 15);
             }
 
-            // If async queue was not yet triggered or polling timed out, fallback to synchronous analyze-s3
+            // If async queue was not yet triggered or polling timed out, call /receipts/analyze-s3
             if (!scanResult) {
               const analyzeRes = await api.post('/receipts/analyze-s3', {
                 bucket,
@@ -254,16 +330,13 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                 receiptId,
                 contentType: file.type || 'image/jpeg',
               });
-              if (analyzeRes.data?.success && (analyzeRes.data.data || analyzeRes.data.items)) {
+              if (analyzeRes.data?.success && (analyzeRes.data.data || analyzeRes.data.items || analyzeRes.data.vendor)) {
                 scanResult = analyzeRes.data.data || analyzeRes.data;
               }
             }
           }
         } catch (pipelineErr) {
-          console.warn('Async S3 receipt pipeline encountered error, trying synchronous fallback:', pipelineErr);
-          if (pipelineErr.code === 'UNSUPPORTED_FORMAT_HEIC') {
-            throw pipelineErr;
-          }
+          console.warn('S3 receipt pipeline encountered error, trying synchronous fallback:', pipelineErr);
         }
       }
 
@@ -277,7 +350,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
           headers: { 'Content-Type': 'multipart/form-data' },
         });
 
-        if (res.data?.success && (res.data.data || res.data.items)) {
+        if (res.data?.success && (res.data.data || res.data.items || res.data.vendor)) {
           scanResult = res.data.data || res.data;
         }
       }
@@ -285,9 +358,10 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
       if (scanResult) {
         const rawItems = Array.isArray(scanResult.items)
           ? scanResult.items.map((it) => ({
-              description: it.quantity > 1 ? `${it.quantity}x ${it.name}` : it.name,
-              name: it.name,
+              description: it.description || (it.quantity > 1 ? `${it.quantity}x ${it.name}` : it.name),
+              name: it.name || it.description || 'Receipt Item',
               quantity: it.quantity || 1,
+              unitPrice: it.unitPrice !== undefined ? Number(it.unitPrice) : (it.quantity > 0 ? Number(it.price || 0) / it.quantity : Number(it.price || 0)),
               price: Number(it.price || 0),
               lowConfidence: Boolean(it.lowConfidence),
             }))
@@ -296,49 +370,82 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
               description: it.description || it.name,
               name: it.name || it.description,
               quantity: it.quantity || 1,
+              unitPrice: it.unitPrice !== undefined ? Number(it.unitPrice) : Number(it.price || 0),
               price: Number(it.price || 0),
               lowConfidence: Boolean(it.lowConfidence),
             }))
           : [];
 
+        const subtotal = Number(scanResult.subtotal) || rawItems.reduce((acc, curr) => acc + (curr.price || 0), 0);
+        const tax = Number(scanResult.tax) || 0;
+        const serviceCharge = Number(scanResult.serviceCharge) || 0;
+        const discount = Number(scanResult.discount) || 0;
+        const total = scanResult.total !== undefined ? Number(scanResult.total) : (Number(scanResult.amount) || (subtotal + tax + serviceCharge - discount));
+
+        const expectedTotal = Math.round((subtotal + tax + serviceCharge - discount + Number.EPSILON) * 100) / 100;
+        const isMismatch = scanResult.mismatch !== undefined ? Boolean(scanResult.mismatch) : Math.abs(expectedTotal - total) > 1.0;
+
         setScanStatus('completed');
         setDraft({
           type: 'expense',
-          amount: scanResult.total !== undefined ? scanResult.total : (scanResult.amount || 0),
+          amount: Math.round((total + Number.EPSILON) * 100) / 100,
           category: scanResult.category || 'Food & Dining',
           date: scanResult.date || new Date().toISOString().slice(0, 10),
           description: scanResult.vendor || scanResult.merchant || 'Receipt Expense',
           lineItems: rawItems,
           items: rawItems,
-          subtotal: scanResult.subtotal || 0,
-          tax: scanResult.tax || 0,
+          subtotal: Math.round((subtotal + Number.EPSILON) * 100) / 100,
+          tax: Math.round((tax + Number.EPSILON) * 100) / 100,
+          serviceCharge: Math.round((serviceCharge + Number.EPSILON) * 100) / 100,
+          discount: Math.round((discount + Number.EPSILON) * 100) / 100,
+          mismatch: isMismatch,
           lowConfidenceItems: Array.isArray(scanResult.lowConfidenceItems) ? scanResult.lowConfidenceItems : [],
           source: scanResult.source || 'aws-textract',
           note: scanResult.note || '',
           receiptS3Key: scanResult.s3Key || '',
-          receiptUrl: scanResult.receiptUrl || '',
+          receiptUrl: scanResult.receiptUrl || previewUrl,
         });
       } else {
         setScanStatus('failed');
-        setError('Could not extract details from receipt image.');
+        setError("Couldn't read this receipt, try a clearer photo or enter it manually");
       }
     } catch (err) {
       setScanStatus('failed');
-      setError(err.response?.data?.message || err.message || 'Receipt scan request failed.');
+      const backendMsg = err.response?.data?.message || err.message;
+      if (backendMsg && (backendMsg.includes('subscription required') || backendMsg.includes('SubscriptionRequiredException'))) {
+        setError(backendMsg);
+      } else {
+        setError("Couldn't read this receipt, try a clearer photo or enter it manually");
+      }
     } finally {
       setScanning(false);
     }
   };
 
   const handleDraftChange = (field, value) => {
-    setDraft((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setDraft((prev) => {
+      const next = {
+        ...prev,
+        [field]: value,
+      };
+
+      // Recalculate mismatch if financial figures change
+      if (['amount', 'subtotal', 'tax', 'serviceCharge', 'discount'].includes(field)) {
+        const sub = Number(field === 'subtotal' ? value : next.subtotal) || 0;
+        const tx = Number(field === 'tax' ? value : next.tax) || 0;
+        const sc = Number(field === 'serviceCharge' ? value : next.serviceCharge) || 0;
+        const dc = Number(field === 'discount' ? value : next.discount) || 0;
+        const tot = Number(field === 'amount' ? value : next.amount) || 0;
+        const calc = Math.round((sub + tx + sc - dc + Number.EPSILON) * 100) / 100;
+        next.mismatch = Math.abs(calc - tot) > 1.0;
+      }
+
+      return next;
+    });
   };
 
   /**
-   * Editable line item changes: updating name, quantity, or price
+   * Editable line item changes: updating name, quantity, unit price, or price
    */
   const handleItemChange = (index, field, value) => {
     if (!draft || !draft.lineItems) return;
@@ -347,23 +454,36 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
 
     if (field === 'price') {
       item.price = parseFloat(value) || 0;
+      if (item.quantity > 0) {
+        item.unitPrice = Math.round((item.price / item.quantity + Number.EPSILON) * 100) / 100;
+      }
+    } else if (field === 'unitPrice') {
+      item.unitPrice = parseFloat(value) || 0;
+      item.price = Math.round((item.unitPrice * (item.quantity || 1) + Number.EPSILON) * 100) / 100;
     } else if (field === 'quantity') {
       item.quantity = parseInt(value, 10) || 1;
+      if (item.unitPrice) {
+        item.price = Math.round((item.unitPrice * item.quantity + Number.EPSILON) * 100) / 100;
+      }
     } else {
       item[field] = value;
     }
     item.description = item.quantity > 1 ? `${item.quantity}x ${item.name}` : item.name;
     updated[index] = item;
 
-    // Recalculate total sum
-    const newComputedTotal = updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + (Number(draft.tax) || 0);
+    const newSubtotal = Math.round((updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + Number.EPSILON) * 100) / 100;
+    const tax = Number(draft.tax) || 0;
+    const serviceCharge = Number(draft.serviceCharge) || 0;
+    const discount = Number(draft.discount) || 0;
+    const newTotal = Math.round((newSubtotal + tax + serviceCharge - discount + Number.EPSILON) * 100) / 100;
 
     setDraft((prev) => ({
       ...prev,
       lineItems: updated,
       items: updated,
-      amount: Math.round((newComputedTotal + Number.EPSILON) * 100) / 100,
-      subtotal: Math.round((updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + Number.EPSILON) * 100) / 100,
+      subtotal: newSubtotal,
+      amount: newTotal,
+      mismatch: false, // Auto-balanced when user updates itemized prices
     }));
   };
 
@@ -373,6 +493,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
       name: 'New Item',
       description: 'New Item',
       quantity: 1,
+      unitPrice: 0,
       price: 0,
       lowConfidence: false,
     };
@@ -387,14 +508,19 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
   const handleDeleteItem = (index) => {
     if (!draft || !draft.lineItems) return;
     const updated = draft.lineItems.filter((_, i) => i !== index);
-    const newComputedTotal = updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + (Number(draft.tax) || 0);
+    const newSubtotal = Math.round((updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + Number.EPSILON) * 100) / 100;
+    const tax = Number(draft.tax) || 0;
+    const serviceCharge = Number(draft.serviceCharge) || 0;
+    const discount = Number(draft.discount) || 0;
+    const newTotal = Math.round((newSubtotal + tax + serviceCharge - discount + Number.EPSILON) * 100) / 100;
 
     setDraft((prev) => ({
       ...prev,
       lineItems: updated,
       items: updated,
-      amount: Math.round((newComputedTotal + Number.EPSILON) * 100) / 100,
-      subtotal: Math.round((updated.reduce((acc, curr) => acc + (curr.price || 0), 0) + Number.EPSILON) * 100) / 100,
+      subtotal: newSubtotal,
+      amount: newTotal,
+      mismatch: false,
     }));
   };
 
@@ -434,6 +560,8 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
           source: draft.source || 'aws-textract',
           subtotal: draft.subtotal,
           tax: draft.tax,
+          serviceCharge: draft.serviceCharge,
+          discount: draft.discount,
           lineItems: draft.lineItems,
           items: draft.items,
         },
@@ -547,7 +675,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                 Drop receipt photo here or click to browse
               </div>
               <div className="text-muted" style={{ fontSize: '0.72rem', marginTop: '2px' }}>
-                Supports JPEG, PNG, PDF up to 10MB
+                Supports JPEG, PNG, PDF, and HEIC (auto-converted to JPEG)
               </div>
             </div>
           )}
@@ -738,7 +866,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                 Review & Confirm Receipt Details
               </div>
               <div className="text-muted" style={{ fontSize: '0.72rem', marginTop: '2px' }}>
-                Extracted via AWS Textract AnalyzeExpense • Adjust line items before splitting
+                Extracted via AWS Textract AnalyzeExpense • Adjust line items before saving
               </div>
             </div>
             <span
@@ -756,6 +884,29 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
             </span>
           </div>
 
+          {/* Mismatch Warning Alert Banner */}
+          {draft.mismatch && (
+            <div
+              style={{
+                padding: '0.6rem 0.8rem',
+                marginBottom: '0.85rem',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                color: 'var(--accent-danger, #ef4444)',
+                fontSize: '0.78rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              <span>⚠️</span>
+              <div>
+                <strong>Check the totals:</strong> The sum of line items (₹{Number(draft.subtotal).toFixed(2)}) + tax (₹{Number(draft.tax).toFixed(2)}) + service charge (₹{Number(draft.serviceCharge).toFixed(2)}) - discount (₹{Number(draft.discount).toFixed(2)}) differs from the final total (₹{Number(draft.amount).toFixed(2)}) by more than ₹1. Please review and adjust the fields below.
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '3px' }}>
@@ -767,7 +918,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                 className="input-glass"
                 value={draft.amount}
                 onChange={(e) => handleDraftChange('amount', e.target.value)}
-                style={{ fontWeight: 700, fontSize: '1.05rem' }}
+                style={{ fontWeight: 700, fontSize: '1.05rem', borderColor: draft.mismatch ? 'var(--accent-danger)' : undefined }}
               />
             </div>
 
@@ -813,6 +964,62 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
             </div>
           </div>
 
+          {/* EDITABLE CHARGES ROW (Subtotal, Tax, Service Charge, Discount) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '0.75rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                Subtotal (₹)
+              </label>
+              <input
+                type="number"
+                step="any"
+                className="input-glass"
+                value={draft.subtotal}
+                onChange={(e) => handleDraftChange('subtotal', e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                Tax / GST (₹)
+              </label>
+              <input
+                type="number"
+                step="any"
+                className="input-glass"
+                value={draft.tax}
+                onChange={(e) => handleDraftChange('tax', e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                Service Charge (₹)
+              </label>
+              <input
+                type="number"
+                step="any"
+                className="input-glass"
+                value={draft.serviceCharge}
+                onChange={(e) => handleDraftChange('serviceCharge', e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                Discount (₹)
+              </label>
+              <input
+                type="number"
+                step="any"
+                className="input-glass"
+                value={draft.discount}
+                onChange={(e) => handleDraftChange('discount', e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+              />
+            </div>
+          </div>
+
           {/* EDITABLE LINE ITEMS TABLE */}
           <div
             style={{
@@ -828,11 +1035,6 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                 EDITABLE LINE ITEMS ({draft.lineItems?.length || 0})
               </span>
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                {draft.subtotal > 0 && (
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Subtotal: ₹{Number(draft.subtotal).toFixed(2)} {draft.tax > 0 ? `+ Tax: ₹${Number(draft.tax).toFixed(2)}` : ''}
-                  </span>
-                )}
                 <Button
                   type="button"
                   variant="secondary"
@@ -884,7 +1086,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                   key={idx}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'minmax(140px, 1fr) 50px 85px 30px',
+                    gridTemplateColumns: 'minmax(120px, 1fr) 45px 70px 75px 25px',
                     gap: '0.4rem',
                     alignItems: 'center',
                     padding: '4px 6px',
@@ -897,7 +1099,7 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                     type="text"
                     className="input-glass"
                     value={item.name}
-                    placeholder="Item name"
+                    placeholder="Description"
                     onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                     style={{ fontSize: '0.75rem', padding: '4px 6px', height: '28px' }}
                   />
@@ -910,18 +1112,26 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
                     onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
                     style={{ fontSize: '0.75rem', padding: '4px 4px', height: '28px', textAlign: 'center' }}
                   />
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      className="input-glass"
-                      value={item.price}
-                      placeholder="Price"
-                      onChange={(e) => handleItemChange(idx, 'price', e.target.value)}
-                      style={{ fontSize: '0.75rem', padding: '4px 6px', height: '28px', fontWeight: 600 }}
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    className="input-glass"
+                    value={item.unitPrice !== undefined ? item.unitPrice : ''}
+                    placeholder="Unit ₹"
+                    onChange={(e) => handleItemChange(idx, 'unitPrice', e.target.value)}
+                    style={{ fontSize: '0.75rem', padding: '4px 6px', height: '28px' }}
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    className="input-glass"
+                    value={item.price}
+                    placeholder="Total ₹"
+                    onChange={(e) => handleItemChange(idx, 'price', e.target.value)}
+                    style={{ fontSize: '0.75rem', padding: '4px 6px', height: '28px', fontWeight: 600 }}
+                  />
                   <button
                     type="button"
                     onClick={() => handleDeleteItem(idx)}

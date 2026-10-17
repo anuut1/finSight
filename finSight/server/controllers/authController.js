@@ -8,7 +8,10 @@ const {
 const { sendWelcomeEmailViaSes } = require('../services/emailService');
 
 const generateToken = (userId) => {
-  const secret = process.env.JWT_SECRET || 'your_secret_key_here';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is missing.');
+  }
   return jwt.sign({ id: userId }, secret, { expiresIn: '7d' });
 };
 

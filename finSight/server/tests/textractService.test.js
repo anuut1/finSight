@@ -17,6 +17,19 @@ describe('textractService - Unit Tests', () => {
       expect(normalizeAmount(null)).toBe(0);
       expect(normalizeAmount(undefined)).toBe(0);
     });
+
+    test('handles negative amounts, parenthesized discounts, and signs', () => {
+      expect(normalizeAmount('-45.00')).toBe(-45);
+      expect(normalizeAmount('(150.50)')).toBe(-150.5);
+      expect(normalizeAmount('₹ -500')).toBe(-500);
+    });
+
+    test('handles Indian currency notations and suffixes', () => {
+      expect(normalizeAmount('Rs. 2,450/-')).toBe(2450);
+      expect(normalizeAmount('INR 1,23,456.00')).toBe(123456);
+      expect(normalizeAmount('₹ 1,500/-')).toBe(1500);
+      expect(normalizeAmount('420,50')).toBe(420.5); // decimal comma
+    });
   });
 
   describe('normalizeDate', () => {
@@ -25,10 +38,29 @@ describe('textractService - Unit Tests', () => {
       expect(normalizeDate('03-Oct-2026')).toBe('2026-10-03');
       expect(normalizeDate('15/08/2026')).toBe('2026-08-15');
     });
+
+    test('parses numeric dates as day-first by default for Indian receipts', () => {
+      // 05/10/2026 should parse as 5th October 2026 (2026-10-05), NOT May 10th
+      expect(normalizeDate('05/10/2026')).toBe('2026-10-05');
+      expect(normalizeDate('01-09-2026')).toBe('2026-09-01');
+    });
+
+    test('handles 2-digit years correctly', () => {
+      expect(normalizeDate('14/10/26')).toBe('2026-10-14');
+    });
+
+    test('rejects unparseable or future dates falling back to today', () => {
+      const today = new Date().toISOString().slice(0, 10);
+      expect(normalizeDate('not-a-valid-date')).toBe(today);
+      expect(normalizeDate('')).toBe(today);
+      // Future date in 2099
+      expect(normalizeDate('2099-12-31')).toBe(today);
+      expect(normalizeDate('31/12/2099')).toBe(today);
+    });
   });
 
   describe('extractFromTextractResponse', () => {
-    test('extracts clean shape with vendor, date, items, subtotal, tax, total, and flags low confidence items', () => {
+    test('extracts clean shape with vendor, date, items (with qty and unitPrice), subtotal, tax, serviceCharge, discount, total, and flags mismatch', () => {
       const mockResponse = {
         ExpenseDocuments: [
           {
@@ -36,23 +68,31 @@ describe('textractService - Unit Tests', () => {
             SummaryFields: [
               {
                 Type: { Text: 'VENDOR_NAME', Confidence: 99.2 },
-                ValueDetection: { Text: 'STARBUCKS INDIRANAGAR', Confidence: 99.2 },
+                ValueDetection: { Text: 'PUNJAB GRILL RESTAURANT', Confidence: 99.2 },
               },
               {
                 Type: { Text: 'INVOICE_RECEIPT_DATE', Confidence: 98.0 },
-                ValueDetection: { Text: '2026-10-03', Confidence: 98.0 },
+                ValueDetection: { Text: '05/10/2026', Confidence: 98.0 },
               },
               {
                 Type: { Text: 'SUBTOTAL', Confidence: 95.5 },
-                ValueDetection: { Text: '₹565.00', Confidence: 95.5 },
+                ValueDetection: { Text: '₹1,200.00', Confidence: 95.5 },
               },
               {
-                Type: { Text: 'TAX', Confidence: 94.0 },
-                ValueDetection: { Text: '₹28.25', Confidence: 94.0 },
+                Type: { Text: 'GST', Confidence: 94.0 },
+                ValueDetection: { Text: '₹60.00', Confidence: 94.0 },
+              },
+              {
+                Type: { Text: 'SERVICE_CHARGE', Confidence: 92.0 },
+                ValueDetection: { Text: '₹120.00', Confidence: 92.0 },
+              },
+              {
+                Type: { Text: 'DISCOUNT', Confidence: 95.0 },
+                ValueDetection: { Text: '₹100.00', Confidence: 95.0 },
               },
               {
                 Type: { Text: 'TOTAL', Confidence: 99.0 },
-                ValueDetection: { Text: '₹593.25', Confidence: 99.0 },
+                ValueDetection: { Text: '₹1,280.00', Confidence: 99.0 }, // 1200 + 60 + 120 - 100 = 1280
               },
             ],
             LineItemGroups: [
@@ -63,15 +103,19 @@ describe('textractService - Unit Tests', () => {
                     LineItemExpenseFields: [
                       {
                         Type: { Text: 'ITEM', Confidence: 95.0 },
-                        ValueDetection: { Text: 'Caffè Mocha (Grande)', Confidence: 95.0 },
+                        ValueDetection: { Text: 'Butter Chicken', Confidence: 95.0 },
                       },
                       {
                         Type: { Text: 'QUANTITY', Confidence: 92.0 },
-                        ValueDetection: { Text: '1', Confidence: 92.0 },
+                        ValueDetection: { Text: '2', Confidence: 92.0 },
+                      },
+                      {
+                        Type: { Text: 'UNIT_PRICE', Confidence: 94.0 },
+                        ValueDetection: { Text: '₹450.00', Confidence: 94.0 },
                       },
                       {
                         Type: { Text: 'PRICE', Confidence: 97.0 },
-                        ValueDetection: { Text: '₹345.00', Confidence: 97.0 },
+                        ValueDetection: { Text: '₹900.00', Confidence: 97.0 },
                       },
                     ],
                   },
@@ -79,28 +123,19 @@ describe('textractService - Unit Tests', () => {
                     LineItemExpenseFields: [
                       {
                         Type: { Text: 'ITEM', Confidence: 96.0 },
-                        ValueDetection: { Text: 'Blueberry Muffin', Confidence: 96.0 },
+                        ValueDetection: { Text: 'Garlic Naan', Confidence: 96.0 },
                       },
                       {
                         Type: { Text: 'QUANTITY', Confidence: 90.0 },
-                        ValueDetection: { Text: '2', Confidence: 90.0 },
+                        ValueDetection: { Text: '3', Confidence: 90.0 },
+                      },
+                      {
+                        Type: { Text: 'UNIT_PRICE', Confidence: 90.0 },
+                        ValueDetection: { Text: '₹100.00', Confidence: 90.0 },
                       },
                       {
                         Type: { Text: 'PRICE', Confidence: 96.5 },
-                        ValueDetection: { Text: '₹220.00', Confidence: 96.5 },
-                      },
-                    ],
-                  },
-                  {
-                    // Item with low confidence (<80%)
-                    LineItemExpenseFields: [
-                      {
-                        Type: { Text: 'ITEM', Confidence: 72.5 },
-                        ValueDetection: { Text: 'Smudged Receipt Line', Confidence: 72.5 },
-                      },
-                      {
-                        Type: { Text: 'PRICE', Confidence: 88.0 },
-                        ValueDetection: { Text: '₹50.00', Confidence: 88.0 },
+                        ValueDetection: { Text: '₹300.00', Confidence: 96.5 },
                       },
                     ],
                   },
@@ -113,41 +148,63 @@ describe('textractService - Unit Tests', () => {
 
       const result = extractFromTextractResponse(mockResponse);
 
-      // Verify required shape
-      expect(result).toHaveProperty('vendor', 'STARBUCKS INDIRANAGAR');
-      expect(result).toHaveProperty('date', '2026-10-03');
-      expect(result).toHaveProperty('subtotal', 565);
-      expect(result).toHaveProperty('tax', 28.25);
-      expect(result).toHaveProperty('total', 593.25);
-      expect(Array.isArray(result.items)).toBe(true);
-      expect(result.items).toHaveLength(3);
+      expect(result.vendor).toBe('PUNJAB GRILL RESTAURANT');
+      expect(result.date).toBe('2026-10-05'); // DD/MM day-first
+      expect(result.subtotal).toBe(1200);
+      expect(result.tax).toBe(60);
+      expect(result.serviceCharge).toBe(120);
+      expect(result.discount).toBe(100);
+      expect(result.total).toBe(1280);
+      expect(result.mismatch).toBe(false);
 
-      // Verify items details & types
+      expect(result.items).toHaveLength(2);
       expect(result.items[0]).toEqual({
-        name: 'Caffè Mocha (Grande)',
-        quantity: 1,
-        price: 345,
+        name: 'Butter Chicken',
+        description: 'Butter Chicken',
+        quantity: 2,
+        unitPrice: 450,
+        price: 900,
       });
-      expect(typeof result.items[0].price).toBe('number');
-      expect(typeof result.items[0].quantity).toBe('number');
 
       expect(result.items[1]).toEqual({
-        name: 'Blueberry Muffin',
-        quantity: 2,
-        price: 220,
+        name: 'Garlic Naan',
+        description: 'Garlic Naan',
+        quantity: 3,
+        unitPrice: 100,
+        price: 300,
       });
+    });
 
-      expect(result.items[2]).toEqual({
-        name: 'Smudged Receipt Line',
-        quantity: 1, // Defaulted to 1 when missing
-        price: 50,
-      });
+    test('flags mismatch=true when line items and charges differ from total by more than ₹1', () => {
+      const mockResponse = {
+        ExpenseDocuments: [
+          {
+            ExpenseIndex: 1,
+            SummaryFields: [
+              { Type: { Text: 'VENDOR_NAME' }, ValueDetection: { Text: 'Cafe Mocha' } },
+              { Type: { Text: 'SUBTOTAL' }, ValueDetection: { Text: '500.00' } },
+              { Type: { Text: 'TAX' }, ValueDetection: { Text: '25.00' } },
+              { Type: { Text: 'TOTAL' }, ValueDetection: { Text: '600.00' } }, // Expected 525, diff is 75 > 1
+            ],
+            LineItemGroups: [
+              {
+                LineItems: [
+                  {
+                    LineItemExpenseFields: [
+                      { Type: { Text: 'ITEM' }, ValueDetection: { Text: 'Coffee' } },
+                      { Type: { Text: 'PRICE' }, ValueDetection: { Text: '500.00' } },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
 
-      // Verify lowConfidenceItems
-      expect(Array.isArray(result.lowConfidenceItems)).toBe(true);
-      expect(result.lowConfidenceItems).toHaveLength(1);
-      expect(result.lowConfidenceItems[0].name).toBe('Smudged Receipt Line');
-      expect(result.lowConfidenceItems[0].confidence).toBe(72.5);
+      const result = extractFromTextractResponse(mockResponse);
+      expect(result.mismatch).toBe(true);
+      expect(result.mismatchDifference).toBe(75);
     });
 
     test('calculates subtotal and total from items if summary fields are missing', () => {
@@ -188,6 +245,7 @@ describe('textractService - Unit Tests', () => {
       expect(result.tax).toBe(0);
       expect(result.total).toBe(300);
       expect(result.lowConfidenceItems).toHaveLength(0);
+      expect(result.mismatch).toBe(false);
     });
 
     test('throws NO_ITEMS_DETECTED error if no line items are found', () => {

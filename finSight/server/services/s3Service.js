@@ -3,7 +3,10 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 
 const region = process.env.AWS_REGION || 'ap-south-1';
-const bucketName = process.env.AWS_RECEIPTS_BUCKET || 'finsight-receipts-private-prod';
+const bucketName = process.env.AWS_RECEIPTS_BUCKET || (process.env.NODE_ENV === 'production' ? '' : 'finsight-receipts-private-dev');
+if (process.env.NODE_ENV === 'production' && !process.env.AWS_RECEIPTS_BUCKET) {
+  console.warn('[AWS S3 Warning] AWS_RECEIPTS_BUCKET is not set in production. S3 receipt operations may fail.');
+}
 
 // S3 Client automatically resolves credentials:
 // 1. In AWS App Runner / ECS: via IAM Task/Instance Role
@@ -74,6 +77,29 @@ async function generateReceiptViewUrl(key) {
   });
 
   return getSignedUrl(s3Client, command, { expiresIn: 3600 });
+}
+
+/**
+ * Fetch an object directly from S3 as a Buffer (for Gemini fallback processing).
+ *
+ * @param {string} key - S3 object key
+ * @param {string} [bucket] - Bucket name (optional, defaults to configured bucketName)
+ * @returns {Promise<Buffer>}
+ */
+async function getReceiptObjectBuffer(key, bucket = null) {
+  const targetBucket = bucket || bucketName;
+  const command = new GetObjectCommand({
+    Bucket: targetBucket,
+    Key: key,
+  });
+
+  const response = await s3Client.send(command);
+  const stream = response.Body;
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 /**
@@ -163,6 +189,7 @@ module.exports = {
   bucketName,
   generateReceiptUploadUrl,
   generateReceiptViewUrl,
+  getReceiptObjectBuffer,
   generateAvatarUploadUrl,
   generateAvatarViewUrl,
   recordAuthAuditLogToS3,
