@@ -6,7 +6,7 @@ const splitMemberSchema = new mongoose.Schema(
     email: { type: String, trim: true, lowercase: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     role: { type: String, enum: ['owner', 'member'], default: 'member' },
-    status: { type: String, enum: ['pending', 'active'], default: 'active' },
+    status: { type: String, enum: ['pending', 'active', 'inactive', 'left'], default: 'active' },
   },
   { _id: true }
 );
@@ -64,7 +64,7 @@ const splitGroupInviteSchema = new mongoose.Schema(
 
 const splitShareSchema = new mongoose.Schema(
   {
-    token: { type: String, unique: true, sparse: true, index: true },
+    token: { type: String, default: null },
     enabled: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, default: null },
@@ -89,6 +89,11 @@ const splitGroupSchema = new mongoose.Schema(
     endDate: { type: Date },
   },
   { timestamps: true }
+);
+
+splitGroupSchema.index(
+  { 'share.token': 1 },
+  { unique: true, partialFilterExpression: { 'share.token': { $type: 'string' } } }
 );
 
 module.exports = mongoose.model('SplitGroup', splitGroupSchema);

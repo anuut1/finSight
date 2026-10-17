@@ -52,6 +52,12 @@ const SplitsPage = () => {
   const [upiDebt, setUpiDebt] = useState(null);
   const [friends, setFriends] = useState([]);
 
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteCopied, setInviteCopied] = useState('');
+  const [inviteSuccessMsg, setInviteSuccessMsg] = useState('');
+
   const selectedGroup = useMemo(
     () => groups.find((group) => group._id === selectedGroupId) || groups[0],
     [groups, selectedGroupId]
@@ -70,6 +76,17 @@ const SplitsPage = () => {
       if (res.data?.success) setFriends(res.data.data || []);
     } catch (e) {
       console.warn('Could not load friends:', e.message);
+    }
+  };
+
+  const fetchPendingInvites = async () => {
+    try {
+      const res = await api.get('/splits/invites/pending');
+      if (res.data?.success) {
+        setPendingInvites(res.data.data || []);
+      }
+    } catch (e) {
+      console.warn('Could not load pending invites:', e.message);
     }
   };
 
@@ -92,7 +109,92 @@ const SplitsPage = () => {
   useEffect(() => {
     fetchGroups();
     fetchFriends();
+    fetchPendingInvites();
   }, []);
+
+  const handleAcceptInvite = async (inviteId) => {
+    setError('');
+    try {
+      const res = await api.post(`/splits/invites/${inviteId}/accept`);
+      if (res.data?.success) {
+        setPendingInvites((prev) => prev.filter((i) => i.inviteId !== inviteId));
+        await fetchGroups();
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to accept invite');
+    }
+  };
+
+  const handleDeclineInvite = async (inviteId) => {
+    setError('');
+    try {
+      const res = await api.post(`/splits/invites/${inviteId}/decline`);
+      if (res.data?.success) {
+        setPendingInvites((prev) => prev.filter((i) => i.inviteId !== inviteId));
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to decline invite');
+    }
+  };
+
+  const handleInviteMember = async (targetEmail, targetName) => {
+    if (!selectedGroup) return;
+    const emailToInvite = (targetEmail || inviteEmail).trim();
+    if (!emailToInvite) {
+      setError('Please provide an email to invite');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setInviteSuccessMsg('');
+    try {
+      const res = await api.post(`/splits/groups/${selectedGroup._id}/invites`, {
+        email: emailToInvite,
+        name: targetName || undefined,
+      });
+      if (res.data?.success) {
+        setInviteSuccessMsg(`Invite sent to ${emailToInvite}!`);
+        if (res.data.data?.inviteLink) {
+          setInviteCopied(res.data.data.inviteLink);
+        }
+        setInviteEmail('');
+        replaceGroup(res.data.data.group);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to send invite');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId, memberName) => {
+    if (!selectedGroup) return;
+    if (!window.confirm(`Remove ${memberName} from this group?`)) return;
+    setError('');
+    try {
+      const res = await api.delete(`/splits/groups/${selectedGroup._id}/members/${memberId}`);
+      if (res.data?.success) {
+        replaceGroup(res.data.data);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove member');
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!selectedGroup) return;
+    if (!window.confirm(`Leave group "${selectedGroup.name}"? You must be fully settled up.`)) return;
+    setError('');
+    try {
+      const res = await api.post(`/splits/groups/${selectedGroup._id}/leave`);
+      if (res.data?.success) {
+        setGroups((prev) => prev.filter((g) => g._id !== selectedGroup._id));
+        setSelectedGroupId('');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to leave group');
+    }
+  };
 
   const toggleFriendInGroup = (friend) => {
     const friendEntry = `${friend.name}, ${friend.email || ''}`.replace(/,\s*$/, '');
@@ -280,6 +382,66 @@ const SplitsPage = () => {
       {/* Trip Mode Banner & Settlement Tool */}
       <TripModeWidget onTripChanged={() => fetchGroups()} />
 
+      {/* Pending Group Invites Banner */}
+      {pendingInvites.length > 0 && (
+        <div
+          style={{
+            marginBottom: '1rem',
+            padding: '0.9rem 1.1rem',
+            borderRadius: 'var(--radius-md, 12px)',
+            background: 'rgba(99, 102, 241, 0.08)',
+            border: '1px solid rgba(99, 102, 241, 0.25)',
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+            ✉️ Group Invitations ({pendingInvites.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {pendingInvites.map((invite) => (
+              <div
+                key={invite.inviteId}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 'var(--radius-sm, 8px)',
+                  background: 'var(--bg-surface-elevated)',
+                  border: '1px solid var(--border-color)',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{invite.groupName}</div>
+                  <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                    Invited by {invite.invitedBy?.name || 'Group Owner'} ({invite.invitedBy?.email || ''})
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleAcceptInvite(invite.inviteId)}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleDeclineInvite(invite.inviteId)}
+                  >
+                    Decline
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {error && (
         <div
           style={{
@@ -340,8 +502,23 @@ const SplitsPage = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  <div style={{ fontWeight: 600 }}>{group.name}</div>
-                  <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600 }}>{group.name}</span>
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        textTransform: 'uppercase',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: group.userRole === 'owner' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                        color: group.userRole === 'owner' ? 'var(--accent-primary, #6366F1)' : 'var(--text-muted)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {group.userRole || 'member'}
+                    </span>
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
                     {group.members.length} members · {group.expenses.length} expenses
                   </div>
                 </button>
@@ -368,6 +545,19 @@ const SplitsPage = () => {
                       <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {selectedGroup.name}
                       </h2>
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-full)',
+                          background: selectedGroup.canManage ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                          color: selectedGroup.canManage ? 'var(--accent-primary, #6366F1)' : 'var(--text-muted)',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        {selectedGroup.userRole === 'owner' ? 'Owner' : 'Member'}
+                      </span>
                       {selectedGroup.isTrip && (
                         <span
                           style={{
@@ -391,7 +581,7 @@ const SplitsPage = () => {
                         {selectedGroup.members.map((m, idx) => (
                           <div
                             key={m._id || m.name}
-                            title={`${m.name} (${m.email || 'No email'})`}
+                            title={`${m.name} (${m.email || 'No email'}) - ${m.role || 'member'}`}
                             style={{
                               width: '28px',
                               height: '28px',
@@ -432,15 +622,124 @@ const SplitsPage = () => {
                     >
                       Record Settle
                     </Button>
+                    {selectedGroup.canManage ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            setInviteSuccessMsg('');
+                            setInviteCopied('');
+                            setInviteModalOpen(true);
+                          }}
+                        >
+                          + Invite Member
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="sm"
+                          onClick={handleDeleteGroup}
+                        >
+                          Delete Group
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleLeaveGroup}
+                      >
+                        Leave Group
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Members Management Panel */}
+              <Card style={{ padding: '1.1rem 1.3rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Group Members</h3>
+                  {selectedGroup.canManage && (
                     <Button
                       type="button"
-                      variant="danger"
+                      variant="secondary"
                       size="sm"
-                      onClick={handleDeleteGroup}
+                      onClick={() => {
+                        setInviteSuccessMsg('');
+                        setInviteCopied('');
+                        setInviteModalOpen(true);
+                      }}
                     >
-                      Delete
+                      + Invite
                     </Button>
-                  </div>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.65rem' }}>
+                  {selectedGroup.members.map((m) => {
+                    const balanceObj = selectedGroup.memberBalances?.find((b) => String(b.memberId) === String(m._id));
+                    const isGroupCreator = selectedGroup.canManage;
+                    const canRemove = isGroupCreator && m.role !== 'owner';
+                    return (
+                      <div
+                        key={m._id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.6rem 0.8rem',
+                          borderRadius: 'var(--radius-sm, 8px)',
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{m.name}</span>
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                background: m.role === 'owner' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                color: m.role === 'owner' ? 'var(--accent-primary, #6366F1)' : 'var(--text-muted)',
+                              }}
+                            >
+                              {m.role || 'member'}
+                            </span>
+                            {m.status === 'pending' && (
+                              <span style={{ fontSize: '0.65rem', color: '#F59E0B' }}>• pending</span>
+                            )}
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {m.email || 'No email provided'}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {balanceObj && <BalanceChip amount={balanceObj.balance} />}
+                          {canRemove && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMember(m._id, m.name)}
+                              title="Remove member"
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                padding: '2px 6px',
+                                fontSize: '0.78rem',
+                              }}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
 
@@ -830,6 +1129,117 @@ const SplitsPage = () => {
             Record settlement
           </Button>
         </form>
+      </Modal>
+
+      <Modal
+        title={`Invite to ${selectedGroup?.name || 'group'}`}
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {inviteSuccessMsg && (
+            <div
+              style={{
+                padding: '0.6rem 0.9rem',
+                borderRadius: 'var(--radius-sm, 8px)',
+                background: 'rgba(16, 185, 129, 0.1)',
+                color: 'var(--color-positive, #10B981)',
+                fontSize: '0.85rem',
+              }}
+            >
+              ✓ {inviteSuccessMsg}
+            </div>
+          )}
+
+          {inviteCopied && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Shareable invite link (expires in 7 days):
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  className="input-glass"
+                  readOnly
+                  value={inviteCopied}
+                  style={{ fontSize: '0.78rem' }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(inviteCopied);
+                    alert('Invite link copied to clipboard!');
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {friends.length > 0 && (
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
+                Invite from your friends:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {friends.map((friend) => {
+                  const alreadyMember = selectedGroup?.members.some(
+                    (m) =>
+                      (m.email && friend.email && m.email.toLowerCase() === friend.email.toLowerCase()) ||
+                      (m.userId && friend.userId && String(m.userId) === String(friend.userId))
+                  );
+                  return (
+                    <button
+                      key={friend.userId}
+                      type="button"
+                      disabled={alreadyMember || saving}
+                      onClick={() => handleInviteMember(friend.email, friend.name)}
+                      style={{
+                        padding: '0.3rem 0.75rem',
+                        borderRadius: '999px',
+                        fontSize: '0.78rem',
+                        border: alreadyMember ? '1px dashed var(--border-color)' : '1px solid var(--accent-primary, #6366F1)',
+                        background: alreadyMember ? 'transparent' : 'rgba(99, 102, 241, 0.1)',
+                        color: alreadyMember ? 'var(--text-muted)' : 'var(--accent-primary, #6366F1)',
+                        cursor: alreadyMember ? 'not-allowed' : 'pointer',
+                        opacity: alreadyMember ? 0.6 : 1,
+                      }}
+                    >
+                      {alreadyMember ? 'Already member: ' : '+ Invite '}
+                      {friend.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleInviteMember();
+            }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+          >
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                Or invite by email
+              </label>
+              <input
+                className="input-glass"
+                type="email"
+                placeholder="friend@example.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
+            </div>
+            <Button type="submit" variant="primary" loading={saving} fullWidth>
+              Send Invitation
+            </Button>
+          </form>
+        </div>
       </Modal>
 
       <UpiSettlementModal

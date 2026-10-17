@@ -57,10 +57,14 @@ const RegisterPage = () => {
     setLoading(true);
     setError('');
     try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const inviteToken = searchParams.get('invite') || undefined;
+
       const res = await api.post('/auth/register', {
         name: form.name.trim(),
         email: cleanEmail,
         password: form.password,
+        ...(inviteToken ? { inviteToken } : {}),
       });
       if (res.data?.success) {
         login(res.data.data.token, res.data.data.user);

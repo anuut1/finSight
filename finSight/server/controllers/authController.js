@@ -1,5 +1,7 @@
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const SplitGroup = require('../models/SplitGroup');
 const {
   recordAuthAuditLogToS3,
   generateAvatarUploadUrl,
@@ -17,7 +19,7 @@ const generateToken = (userId) => {
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, inviteToken } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'All fields are required' });
@@ -40,6 +42,62 @@ exports.register = async (req, res) => {
       lastLoginIp: clientIp,
     });
     await user.save();
+
+    // Auto-accept group invite if inviteToken is present or if pending invite exists for this email
+    try {
+      let groupToJoin = null;
+      let matchingInvite = null;
+
+      if (inviteToken) {
+        const tokenHash = crypto.createHash('sha256').update(inviteToken.trim()).digest('hex');
+        groupToJoin = await SplitGroup.findOne({
+          'invites.token': tokenHash,
+          'invites.status': 'pending',
+          'invites.expiresAt': { $gt: new Date() },
+        });
+        if (groupToJoin) {
+          matchingInvite = groupToJoin.invites.find(
+            (inv) => inv.token === tokenHash && inv.status === 'pending'
+          );
+        }
+      }
+
+      if (!groupToJoin) {
+        groupToJoin = await SplitGroup.findOne({
+          'invites.email': normalizedEmail,
+          'invites.status': 'pending',
+          'invites.expiresAt': { $gt: new Date() },
+        });
+        if (groupToJoin) {
+          matchingInvite = groupToJoin.invites.find(
+            (inv) => inv.email === normalizedEmail && inv.status === 'pending'
+          );
+        }
+      }
+
+      if (groupToJoin && matchingInvite) {
+        matchingInvite.status = 'accepted';
+        let member = groupToJoin.members.find(
+          (m) => m.email && m.email.toLowerCase() === normalizedEmail
+        );
+        if (member) {
+          member.userId = user._id;
+          member.status = 'active';
+          member.name = user.name || member.name;
+        } else {
+          groupToJoin.members.push({
+            name: user.name,
+            email: normalizedEmail,
+            userId: user._id,
+            role: 'member',
+            status: 'active',
+          });
+        }
+        await groupToJoin.save();
+      }
+    } catch (e) {
+      console.warn('[Auto-accept Invite] Error:', e.message);
+    }
 
     // 1. Record registration event directly in AWS S3 audit logs
     recordAuthAuditLogToS3({

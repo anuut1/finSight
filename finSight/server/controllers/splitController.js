@@ -1,8 +1,18 @@
+const crypto = require('crypto');
 const SplitGroup = require('../models/SplitGroup');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const UpiDraft = require('../models/UpiDraft');
 const { cleanAndCategorizeExpense } = require('../services/bedrockService');
+const {
+  findGroupWithAccess,
+  canManageMembers,
+  canDeleteGroup,
+  canEndTrip,
+  canAddExpense,
+  canAddSettlement,
+} = require('../services/splitAccess');
+const { sendGroupInviteEmailViaSes } = require('../services/emailService');
 
 const roundMoney = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -15,7 +25,6 @@ const getOwnerMemberId = (group) => {
   if (group.ownerMemberId && group.members.id(group.ownerMemberId)) {
     return group.ownerMemberId.toString();
   }
-
   return group.members[0]?._id.toString();
 };
 
@@ -54,6 +63,9 @@ const calculateBalances = (group) => {
       memberId,
       name: member.name,
       email: member.email,
+      userId: member.userId,
+      role: member.role || 'member',
+      status: member.status || 'active',
       balance: roundMoney(balances[memberId] || 0),
     };
   });
@@ -93,19 +105,42 @@ const calculateBalances = (group) => {
   return { memberBalances, simplifiedDebts };
 };
 
-const serializeGroup = (group) => {
+const serializeGroup = (group, currentUserId = null) => {
   const { memberBalances, simplifiedDebts } = calculateBalances(group);
   const groupObject = group.toObject();
   const ownerMemberId = getOwnerMemberId(group);
 
+  const uIdStr = currentUserId ? currentUserId.toString() : null;
+  const isCreator = group.userId && uIdStr && group.userId.toString() === uIdStr;
+  const activeMember = uIdStr && group.members
+    ? group.members.find((m) => m.userId && m.userId.toString() === uIdStr && m.status === 'active')
+    : null;
+  const userRole = isCreator || (activeMember && activeMember.role === 'owner')
+    ? 'owner'
+    : (activeMember ? 'member' : 'stranger');
+  const canManage = userRole === 'owner';
+
   return {
     ...groupObject,
     ownerMemberId,
-    expenses: groupObject.expenses.map((expense) => ({
-      ...expense,
-      paidByName: getMemberName(group, expense.paidBy),
-      splitBetweenNames: expense.splitBetween.map((id) => getMemberName(group, id)),
-    })),
+    userRole,
+    canManage,
+    expenses: groupObject.expenses.map((expense) => {
+      // Isolate personalSync so that a member only sees their own personal transaction info
+      const myPersonalSync = uIdStr && Array.isArray(expense.personalSync)
+        ? expense.personalSync.find((ps) => ps.userId && ps.userId.toString() === uIdStr)
+        : null;
+
+      return {
+        ...expense,
+        paidByName: getMemberName(group, expense.paidBy),
+        splitBetweenNames: expense.splitBetween.map((id) => getMemberName(group, id)),
+        // Only expose personalTransactionId if it belongs to current user
+        personalTransactionId: myPersonalSync?.transactionId || (isCreator ? expense.personalTransactionId : null),
+        personalShareAmount: myPersonalSync?.amount || (isCreator ? expense.personalShareAmount : 0),
+        personalSync: myPersonalSync ? [myPersonalSync] : [],
+      };
+    }),
     settlements: groupObject.settlements.map((settlement) => ({
       ...settlement,
       fromName: getMemberName(group, settlement.from),
@@ -116,10 +151,23 @@ const serializeGroup = (group) => {
   };
 };
 
+/**
+ * Get groups where current user is the creator OR an active member.
+ */
 exports.getGroups = async (req, res) => {
   try {
-    const groups = await SplitGroup.find({ userId: req.user.id }).sort({ updatedAt: -1 });
-    return res.json({ success: true, data: groups.map(serializeGroup) });
+    const currentUserId = req.user.id;
+    const groups = await SplitGroup.find({
+      $or: [
+        { userId: currentUserId },
+        { 'members.userId': currentUserId, 'members.status': 'active' },
+      ],
+    }).sort({ updatedAt: -1 });
+
+    return res.json({
+      success: true,
+      data: groups.map((g) => serializeGroup(g, currentUserId)),
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -186,13 +234,16 @@ exports.createGroup = async (req, res) => {
 
     await group.save();
 
-    return res.status(201).json({ success: true, data: serializeGroup(group) });
+    return res.status(201).json({ success: true, data: serializeGroup(group, req.user.id) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
+/**
+ * Add a shared expense with isolated per-member personal budget sync.
+ */
 exports.addExpense = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -210,9 +261,13 @@ exports.addExpense = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing expense details' });
     }
 
-    const group = await SplitGroup.findOne({ _id: groupId, userId: req.user.id });
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
     if (!group) {
-      return res.status(404).json({ success: false, message: 'Group not found' });
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    if (!canAddExpense(access)) {
+      return res.status(403).json({ success: false, message: 'Permission denied to add expense' });
     }
 
     const memberIds = group.members.map((member) => member._id.toString());
@@ -223,11 +278,8 @@ exports.addExpense = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid group member selected' });
     }
 
-    const ownerMemberId = getOwnerMemberId(group);
     const numericAmount = Number(amount);
-    const personalShareAmount = splitBetween.includes(ownerMemberId)
-      ? roundMoney(numericAmount / splitBetween.length)
-      : 0;
+    const perMemberShare = roundMoney(numericAmount / splitBetween.length);
 
     const expense = group.expenses.create({
       description,
@@ -237,32 +289,52 @@ exports.addExpense = async (req, res) => {
       date,
       category,
       syncPersonal,
-      personalShareAmount: syncPersonal ? personalShareAmount : 0,
+      personalShareAmount: perMemberShare,
+      createdBy: req.user.id,
+      personalSync: [],
     });
+
+    // Create personal transaction for EACH participant linked to a user account
+    if (syncPersonal && perMemberShare > 0) {
+      for (const participantId of splitBetween) {
+        const participantMember = group.members.id(participantId);
+        if (participantMember && participantMember.userId) {
+          try {
+            const tx = await Transaction.create({
+              userId: participantMember.userId,
+              type: 'expense',
+              category,
+              amount: perMemberShare,
+              description: `${description} (${group.name} split share)`,
+              date,
+              tags: ['split', group.name],
+              mood: 'neutral',
+              source: 'split',
+              splitGroupId: group._id,
+              splitExpenseId: expense._id,
+            });
+
+            expense.personalSync.push({
+              userId: participantMember.userId,
+              amount: perMemberShare,
+              transactionId: tx._id,
+            });
+
+            if (participantMember.userId.toString() === req.user.id.toString()) {
+              expense.personalTransactionId = tx._id;
+              expense.personalShareAmount = perMemberShare;
+            }
+          } catch (txErr) {
+            console.warn('[PersonalSync] Failed to create transaction for member:', participantMember.userId, txErr.message);
+          }
+        }
+      }
+    }
 
     group.expenses.push(expense);
     await group.save();
 
-    if (syncPersonal && personalShareAmount > 0) {
-      const transaction = await Transaction.create({
-        userId: req.user.id,
-        type: 'expense',
-        category,
-        amount: personalShareAmount,
-        description: `${description} (${group.name} split share)`,
-        date,
-        tags: ['split', group.name],
-        mood: 'neutral',
-        source: 'split',
-        splitGroupId: group._id,
-        splitExpenseId: expense._id,
-      });
-
-      expense.personalTransactionId = transaction._id;
-      await group.save();
-    }
-
-    return res.status(201).json({ success: true, data: serializeGroup(group) });
+    return res.status(201).json({ success: true, data: serializeGroup(group, req.user.id) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -278,14 +350,18 @@ exports.addSettlement = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing settlement details' });
     }
 
-    const group = await SplitGroup.findOne({ _id: groupId, userId: req.user.id });
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
     if (!group) {
-      return res.status(404).json({ success: false, message: 'Group not found' });
+      return res.status(access.status).json({ success: false, message: access.message });
     }
 
     const memberIds = group.members.map((member) => member._id.toString());
     if (!memberIds.includes(from) || !memberIds.includes(to) || from === to) {
       return res.status(400).json({ success: false, message: 'Invalid settlement members' });
+    }
+
+    if (!canAddSettlement(access, { from, to })) {
+      return res.status(403).json({ success: false, message: 'You can only record settlements involving yourself' });
     }
 
     group.settlements.push({
@@ -294,10 +370,11 @@ exports.addSettlement = async (req, res) => {
       amount: Number(amount),
       date,
       note,
+      createdBy: req.user.id,
     });
 
     await group.save();
-    return res.status(201).json({ success: true, data: serializeGroup(group) });
+    return res.status(201).json({ success: true, data: serializeGroup(group, req.user.id) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -306,22 +383,30 @@ exports.addSettlement = async (req, res) => {
 
 exports.deleteGroup = async (req, res) => {
   try {
-    const group = await SplitGroup.findOneAndDelete({
-      _id: req.params.groupId,
-      userId: req.user.id,
+    const { group, access } = await findGroupWithAccess(req.params.groupId, req.user.id);
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    if (!canDeleteGroup(access)) {
+      return res.status(403).json({ success: false, message: 'Only the group owner can delete this group' });
+    }
+
+    const transactionIds = [];
+    group.expenses.forEach((expense) => {
+      if (expense.personalTransactionId) transactionIds.push(expense.personalTransactionId);
+      if (Array.isArray(expense.personalSync)) {
+        expense.personalSync.forEach((ps) => {
+          if (ps.transactionId) transactionIds.push(ps.transactionId);
+        });
+      }
     });
 
-    if (!group) {
-      return res.status(404).json({ success: false, message: 'Group not found' });
-    }
-
-    const transactionIds = group.expenses
-      .map((expense) => expense.personalTransactionId)
-      .filter(Boolean);
-
     if (transactionIds.length) {
-      await Transaction.deleteMany({ _id: { $in: transactionIds }, userId: req.user.id });
+      await Transaction.deleteMany({ _id: { $in: transactionIds } });
     }
+
+    await group.deleteOne();
 
     return res.json({ success: true, data: group });
   } catch (err) {
@@ -330,8 +415,8 @@ exports.deleteGroup = async (req, res) => {
   }
 };
 
-const getTripSummaryData = (group) => {
-  const serialized = serializeGroup(group);
+const getTripSummaryData = (group, currentUserId = null) => {
+  const serialized = serializeGroup(group, currentUserId);
   const totalSpend = roundMoney(
     group.expenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0)
   );
@@ -373,8 +458,12 @@ const getTripSummaryData = (group) => {
 
 exports.getActiveTrip = async (req, res) => {
   try {
+    const currentUserId = req.user.id;
     const activeTrip = await SplitGroup.findOne({
-      userId: req.user.id,
+      $or: [
+        { userId: currentUserId },
+        { 'members.userId': currentUserId, 'members.status': 'active' },
+      ],
       isTrip: true,
       tripStatus: 'active',
     });
@@ -383,7 +472,7 @@ exports.getActiveTrip = async (req, res) => {
       return res.json({ success: true, data: null });
     }
 
-    return res.json({ success: true, data: getTripSummaryData(activeTrip) });
+    return res.json({ success: true, data: getTripSummaryData(activeTrip, currentUserId) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -460,7 +549,7 @@ exports.startTrip = async (req, res) => {
 
     await tripGroup.save();
 
-    return res.status(201).json({ success: true, data: getTripSummaryData(tripGroup) });
+    return res.status(201).json({ success: true, data: getTripSummaryData(tripGroup, req.user.id) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -470,21 +559,21 @@ exports.startTrip = async (req, res) => {
 exports.endTrip = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const tripGroup = await SplitGroup.findOne({
-      _id: groupId,
-      userId: req.user.id,
-      isTrip: true,
-    });
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
 
-    if (!tripGroup) {
-      return res.status(404).json({ success: false, message: 'Trip group not found' });
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
     }
 
-    tripGroup.tripStatus = 'ended';
-    tripGroup.endDate = new Date();
-    await tripGroup.save();
+    if (!canEndTrip(access)) {
+      return res.status(403).json({ success: false, message: 'Only the trip host can end this trip' });
+    }
 
-    return res.json({ success: true, data: getTripSummaryData(tripGroup) });
+    group.tripStatus = 'ended';
+    group.endDate = new Date();
+    await group.save();
+
+    return res.json({ success: true, data: getTripSummaryData(group, req.user.id) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -494,26 +583,450 @@ exports.endTrip = async (req, res) => {
 exports.getTripSummary = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const tripGroup = await SplitGroup.findOne({
-      _id: groupId,
-      userId: req.user.id,
-      isTrip: true,
-    });
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
 
-    if (!tripGroup) {
-      return res.status(404).json({ success: false, message: 'Trip group not found' });
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
     }
 
-    return res.json({ success: true, data: getTripSummaryData(tripGroup) });
+    return res.json({ success: true, data: getTripSummaryData(group, req.user.id) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
+/**
+ * Invite a member to group by email or friend user ID (Owner only).
+ * Tokens are random, hashed at rest, single-use, and expire in 7 days.
+ */
+exports.inviteMember = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { email, friendUserId, name } = req.body;
+
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    if (!canManageMembers(access)) {
+      return res.status(403).json({ success: false, message: 'Only the group owner can invite members' });
+    }
+
+    let targetEmail = '';
+    let targetName = name || '';
+    let targetUserId = null;
+
+    if (friendUserId) {
+      const friendUser = await User.findById(friendUserId);
+      if (!friendUser) {
+        return res.status(404).json({ success: false, message: 'Friend user not found' });
+      }
+      targetEmail = friendUser.email.toLowerCase();
+      targetName = targetName || friendUser.name;
+      targetUserId = friendUser._id;
+    } else if (email) {
+      targetEmail = email.trim().toLowerCase();
+      const existingUser = await User.findOne({ email: targetEmail });
+      if (existingUser) {
+        targetUserId = existingUser._id;
+        targetName = targetName || existingUser.name;
+      } else {
+        targetName = targetName || targetEmail.split('@')[0];
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Please provide an email or friend to invite' });
+    }
+
+    // Check if user is already an active member
+    const isAlreadyActive = group.members.some(
+      (m) =>
+        (targetEmail && m.email && m.email.toLowerCase() === targetEmail && m.status === 'active') ||
+        (targetUserId && m.userId && m.userId.toString() === targetUserId.toString() && m.status === 'active')
+    );
+    if (isAlreadyActive) {
+      return res.status(400).json({ success: false, message: 'User is already an active member of this group' });
+    }
+
+    // Generate secure single-use token (7-day expiry, hashed at rest)
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    group.invites.push({
+      email: targetEmail,
+      token: tokenHash,
+      role: 'member',
+      invitedBy: req.user.id,
+      status: 'pending',
+      createdAt: new Date(),
+      expiresAt,
+    });
+
+    const inviteRecord = group.invites[group.invites.length - 1];
+
+    // Ensure a pending member record exists
+    let existingMember = group.members.find(
+      (m) =>
+        (targetEmail && m.email && m.email.toLowerCase() === targetEmail) ||
+        (targetUserId && m.userId && m.userId.toString() === targetUserId.toString())
+    );
+
+    if (existingMember) {
+      existingMember.status = 'pending';
+      if (targetUserId) existingMember.userId = targetUserId;
+    } else {
+      group.members.push({
+        name: targetName,
+        email: targetEmail,
+        userId: targetUserId || undefined,
+        role: 'member',
+        status: 'pending',
+      });
+    }
+
+    await group.save();
+
+    // Send SES invite email
+    sendGroupInviteEmailViaSes({
+      toEmail: targetEmail,
+      inviterName: req.user.name,
+      groupName: group.name,
+      isTrip: group.isTrip,
+      inviteToken: rawToken,
+      isRegistered: Boolean(targetUserId),
+    }).catch((err) => console.warn('[SES Group Invite] Error:', err.message));
+
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const inviteLink = `${clientUrl}/splits?invite=${encodeURIComponent(rawToken)}`;
+
+    return res.status(201).json({
+      success: true,
+      message: 'Invitation sent successfully',
+      data: {
+        inviteId: inviteRecord._id,
+        email: targetEmail,
+        rawToken,
+        inviteLink,
+        expiresAt,
+        group: serializeGroup(group, req.user.id),
+      },
+    });
+  } catch (err) {
+    console.error('Error inviting member:', err);
+    return res.status(500).json({ success: false, message: 'Failed to invite member' });
+  }
+};
+
+/**
+ * List pending group invites for current logged-in user.
+ */
+exports.getMyPendingInvites = async (req, res) => {
+  try {
+    const userEmail = (req.user.email || '').toLowerCase();
+    const groups = await SplitGroup.find({
+      invites: {
+        $elemMatch: {
+          email: userEmail,
+          status: 'pending',
+          expiresAt: { $gt: new Date() },
+        },
+      },
+    }).populate('invites.invitedBy', 'name email avatarUrl');
+
+    const pendingInvites = [];
+    groups.forEach((group) => {
+      const matchingInvites = group.invites.filter(
+        (inv) =>
+          inv.email === userEmail &&
+          inv.status === 'pending' &&
+          new Date(inv.expiresAt) > new Date()
+      );
+
+      matchingInvites.forEach((inv) => {
+        pendingInvites.push({
+          inviteId: inv._id,
+          groupId: group._id,
+          groupName: group.name,
+          isTrip: group.isTrip,
+          role: inv.role,
+          invitedBy: inv.invitedBy?.name || 'Group Owner',
+          invitedByEmail: inv.invitedBy?.email,
+          createdAt: inv.createdAt,
+          expiresAt: inv.expiresAt,
+        });
+      });
+    });
+
+    return res.json({ success: true, data: pendingInvites });
+  } catch (err) {
+    console.error('Error getting pending invites:', err);
+    return res.status(500).json({ success: false, message: 'Failed to load invites' });
+  }
+};
+
+/**
+ * Accept a group invite by inviteId or token.
+ */
+exports.acceptGroupInvite = async (req, res) => {
+  try {
+    const { inviteId } = req.params;
+    const { token } = req.body || {};
+    const userEmail = (req.user.email || '').toLowerCase();
+
+    let group = null;
+    let invite = null;
+
+    if (token) {
+      const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+      group = await SplitGroup.findOne({
+        'invites.token': tokenHash,
+        'invites.status': 'pending',
+        'invites.expiresAt': { $gt: new Date() },
+      });
+      if (group) {
+        invite = group.invites.find(
+          (inv) => inv.token === tokenHash && inv.status === 'pending'
+        );
+      }
+    }
+
+    if (!group && inviteId) {
+      group = await SplitGroup.findOne({
+        'invites._id': inviteId,
+        'invites.status': 'pending',
+        'invites.expiresAt': { $gt: new Date() },
+      });
+      if (group) {
+        invite = group.invites.id(inviteId);
+      }
+    }
+
+    if (!group || !invite) {
+      return res.status(404).json({ success: false, message: 'Invite not found or has expired' });
+    }
+
+    // Mark single-use token as accepted
+    invite.status = 'accepted';
+
+    // Activate membership in group
+    let member = group.members.find(
+      (m) =>
+        (m.email && m.email.toLowerCase() === userEmail) ||
+        (invite.email && m.email && m.email.toLowerCase() === invite.email.toLowerCase()) ||
+        (m.userId && m.userId.toString() === req.user.id.toString())
+    );
+
+    if (member) {
+      member.userId = req.user.id;
+      member.status = 'active';
+      member.name = req.user.name || member.name;
+    } else {
+      group.members.push({
+        name: req.user.name || invite.email.split('@')[0],
+        email: userEmail,
+        userId: req.user.id,
+        role: 'member',
+        status: 'active',
+      });
+    }
+
+    await group.save();
+
+    return res.json({
+      success: true,
+      message: `You joined "${group.name}"`,
+      data: serializeGroup(group, req.user.id),
+    });
+  } catch (err) {
+    console.error('Error accepting group invite:', err);
+    return res.status(500).json({ success: false, message: 'Failed to accept invite' });
+  }
+};
+
+/**
+ * Decline a group invite.
+ */
+exports.declineGroupInvite = async (req, res) => {
+  try {
+    const { inviteId } = req.params;
+    const { token } = req.body || {};
+    const userEmail = (req.user.email || '').toLowerCase();
+
+    let group = null;
+    let invite = null;
+
+    if (token) {
+      const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+      group = await SplitGroup.findOne({
+        'invites.token': tokenHash,
+        'invites.status': 'pending',
+      });
+      if (group) {
+        invite = group.invites.find((inv) => inv.token === tokenHash);
+      }
+    }
+
+    if (!group && inviteId) {
+      group = await SplitGroup.findOne({
+        'invites._id': inviteId,
+      });
+      if (group) {
+        invite = group.invites.id(inviteId);
+      }
+    }
+
+    if (!group || !invite) {
+      return res.status(404).json({ success: false, message: 'Invite not found' });
+    }
+
+    invite.status = 'declined';
+
+    // Remove pending member entry if it has no expenses or settlements
+    const member = group.members.find(
+      (m) =>
+        (m.email && m.email.toLowerCase() === userEmail) ||
+        (invite.email && m.email && m.email.toLowerCase() === invite.email.toLowerCase())
+    );
+
+    if (member && member.status === 'pending') {
+      const hasHistory =
+        group.expenses.some((e) => e.paidBy.toString() === member._id.toString() || e.splitBetween.map((id) => id.toString()).includes(member._id.toString())) ||
+        group.settlements.some((s) => s.from.toString() === member._id.toString() || s.to.toString() === member._id.toString());
+
+      if (!hasHistory) {
+        group.members.pull(member._id);
+      }
+    }
+
+    await group.save();
+
+    return res.json({ success: true, message: 'Invite declined' });
+  } catch (err) {
+    console.error('Error declining group invite:', err);
+    return res.status(500).json({ success: false, message: 'Failed to decline invite' });
+  }
+};
+
+/**
+ * Leave a group (Non-owner member only).
+ */
+exports.leaveGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    if (access.isOwner) {
+      const otherActiveMembers = group.members.filter(
+        (m) => m._id.toString() !== access.currentMember?._id.toString() && m.status === 'active'
+      );
+      if (otherActiveMembers.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'The group owner cannot leave the group while other members are present. You can delete the group instead.',
+        });
+      }
+    }
+
+    if (!access.currentMember) {
+      return res.status(404).json({ success: false, message: 'Member record not found' });
+    }
+
+    // Verify member has settled balances
+    const { memberBalances } = calculateBalances(group);
+    const myBalance = memberBalances.find(
+      (mb) => mb.memberId === access.currentMember._id.toString()
+    );
+
+    if (myBalance && Math.abs(myBalance.balance) > 0.5) {
+      return res.status(400).json({
+        success: false,
+        message: `Please settle your outstanding balance of ₹${Math.abs(myBalance.balance).toFixed(2)} before leaving the group.`,
+      });
+    }
+
+    access.currentMember.status = 'inactive';
+    await group.save();
+
+    return res.json({ success: true, message: 'You have left the group' });
+  } catch (err) {
+    console.error('Error leaving group:', err);
+    return res.status(500).json({ success: false, message: 'Failed to leave group' });
+  }
+};
+
+/**
+ * Remove a member from the group (Owner only).
+ */
+exports.removeMember = async (req, res) => {
+  try {
+    const { groupId, memberId } = req.params;
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    if (!canManageMembers(access)) {
+      return res.status(403).json({ success: false, message: 'Only the group owner can remove members' });
+    }
+
+    const targetMember = group.members.id(memberId);
+    if (!targetMember) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+
+    if (targetMember._id.toString() === group.ownerMemberId?.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot remove the group owner' });
+    }
+
+    // Check active balance
+    const { memberBalances } = calculateBalances(group);
+    const mb = memberBalances.find((b) => b.memberId === memberId);
+    if (mb && Math.abs(mb.balance) > 0.5) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot remove member with active balance of ₹${Math.abs(mb.balance).toFixed(2)}. Please settle first.`,
+      });
+    }
+
+    // If member has no past expense/settlement records, we can remove them cleanly
+    const hasHistory =
+      group.expenses.some((e) => e.paidBy.toString() === memberId || e.splitBetween.map((id) => id.toString()).includes(memberId)) ||
+      group.settlements.some((s) => s.from.toString() === memberId || s.to.toString() === memberId);
+
+    if (!hasHistory) {
+      group.members.pull(memberId);
+    } else {
+      targetMember.status = 'inactive';
+    }
+
+    await group.save();
+
+    return res.json({
+      success: true,
+      message: 'Member removed successfully',
+      data: serializeGroup(group, req.user.id),
+    });
+  } catch (err) {
+    console.error('Error removing member:', err);
+    return res.status(500).json({ success: false, message: 'Failed to remove member' });
+  }
+};
+
 exports.getUpiDrafts = async (req, res) => {
   try {
     const { groupId } = req.params;
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
     const drafts = await UpiDraft.find({
       tripId: groupId,
       status: { $in: ['pending_assignment', 'poll_created'] },
@@ -529,23 +1042,20 @@ exports.getUpiDrafts = async (req, res) => {
 exports.createUpiDraft = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { rawText, amount, upiRef } = req.body;
+    const { amount, rawText, upiRef } = req.body;
 
-    const tripGroup = await SplitGroup.findOne({
-      _id: groupId,
-      userId: req.user.id,
-    });
-    if (!tripGroup) {
-      return res.status(404).json({ success: false, message: 'Trip group not found' });
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+    if (!group) {
+      return res.status(access.status).json({ success: false, message: access.message });
     }
 
-    const aiCleaned = await cleanAndCategorizeExpense({
-      rawString: rawText || 'UPI Payment',
-      amount: Number(amount) || 0,
-    });
+    if (!amount) {
+      return res.status(400).json({ success: false, message: 'Amount is required' });
+    }
+
+    const aiCleaned = await cleanAndCategorizeExpense(rawText || `UPI payment of ${amount}`);
 
     const draft = new UpiDraft({
-      userId: req.user.id,
       tripId: groupId,
       rawText: rawText || '',
       cleanMerchant: aiCleaned.cleanMerchant,
@@ -568,12 +1078,9 @@ exports.assignUpiDraft = async (req, res) => {
     const { groupId, draftId } = req.params;
     const { mode = 'assign', splitBetween, paidBy, question } = req.body;
 
-    const group = await SplitGroup.findOne({
-      _id: groupId,
-      userId: req.user.id,
-    });
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
     if (!group) {
-      return res.status(404).json({ success: false, message: 'Trip group not found' });
+      return res.status(access.status).json({ success: false, message: access.message });
     }
 
     const draft = await UpiDraft.findOne({ _id: draftId, tripId: groupId });
@@ -628,7 +1135,7 @@ exports.assignUpiDraft = async (req, res) => {
       data: {
         draft,
         expense: createdExpense,
-        group: serializeGroup(group),
+        group: serializeGroup(group, req.user.id),
       },
     });
   } catch (err) {
@@ -636,4 +1143,3 @@ exports.assignUpiDraft = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
-

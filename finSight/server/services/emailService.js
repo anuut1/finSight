@@ -184,8 +184,71 @@ async function sendFriendInviteEmailViaSes({ toEmail, inviterName, inviterCode }
   });
 }
 
+/**
+ * Send an email inviting a user to a split group or trip.
+ */
+async function sendGroupInviteEmailViaSes({ toEmail, inviterName, groupName, isTrip = false, inviteToken, isRegistered = false }) {
+  const appUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const entityType = isTrip ? 'trip' : 'split group';
+  const inviteUrl = isRegistered
+    ? `${appUrl}/splits?invite=${encodeURIComponent(inviteToken)}`
+    : `${appUrl}/register?invite=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(toEmail)}`;
+
+  const subject = `${inviterName || 'A friend'} invited you to join "${groupName}" on FinSight ✈️`;
+  const textBody = `Hi,\n\n${inviterName || 'A friend'} has invited you to join the ${entityType} "${groupName}" on FinSight to track shared expenses and split bills.\n\nClick here to accept the invitation:\n${inviteUrl}\n\nThis invitation is single-use and will expire in 7 days.\n\nBest regards,\nThe FinSight Team`;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Group Invitation</title>
+</head>
+<body style="background-color: #0B1120; color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; margin: 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #1E293B; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
+    <tr>
+      <td style="padding: 32px 32px 20px 32px; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); text-align: center;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700;">FinSight</h1>
+        <p style="margin: 8px 0 0 0; color: #E0E7FF; font-size: 14px;">Collaborative Bill Splitting & Trip Expenses</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 32px;">
+        <h2 style="margin: 0 0 16px 0; color: #F8FAFC; font-size: 20px;">You're invited to "${groupName}"! ✈️</h2>
+        <p style="color: #94A3B8; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+          <strong>${inviterName || 'A collaborator'}</strong> added you to the ${entityType} <strong>"${groupName}"</strong> on FinSight. Join to collaborate on expenses, check live balances, and settle up with one tap.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${inviteUrl}" style="background-color: #6366F1; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+            ${isRegistered ? 'Accept Invitation & View Group' : 'Sign Up to Join Group'}
+          </a>
+        </div>
+        <p style="color: #64748B; font-size: 13px; line-height: 1.5; margin: 20px 0 0 0;">
+          Note: This invitation link expires in 7 days and is single-use.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 20px 32px; background-color: #0F172A; text-align: center; font-size: 12px; color: #64748B;">
+        Sent securely via Amazon Simple Email Service (SES).
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  return sendTransactionalEmailViaSes({
+    toEmail,
+    subject,
+    htmlBody,
+    textBody,
+  });
+}
+
 module.exports = {
   sendTransactionalEmailViaSes,
   sendWelcomeEmailViaSes,
   sendFriendInviteEmailViaSes,
+  sendGroupInviteEmailViaSes,
 };

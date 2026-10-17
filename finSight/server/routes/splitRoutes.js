@@ -12,6 +12,12 @@ const {
   getUpiDrafts,
   createUpiDraft,
   assignUpiDraft,
+  inviteMember,
+  getMyPendingInvites,
+  acceptGroupInvite,
+  declineGroupInvite,
+  leaveGroup,
+  removeMember,
 } = require('../controllers/splitController');
 const { validate, z } = require('../middleware/validate');
 
@@ -72,16 +78,36 @@ const createUpiDraftSchema = z.object({
   upiRef: z.string().optional(),
 });
 
+const inviteMemberSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email address').optional(),
+    friendUserId: z.string().optional(),
+    name: z.string().trim().optional(),
+  })
+  .refine((data) => Boolean(data.email || data.friendUserId), {
+    message: 'Must provide either an email or friendUserId',
+  });
+
 router.get('/trips/active', getActiveTrip);
 router.post('/trips/start', validate(startTripSchema), startTrip);
 router.post('/trips/:groupId/end', endTrip);
 router.get('/trips/:groupId/summary', getTripSummary);
+
+// Pending group invites for current user
+router.get('/invites/pending', getMyPendingInvites);
+router.post('/invites/:inviteId/accept', acceptGroupInvite);
+router.post('/invites/:inviteId/decline', declineGroupInvite);
 
 router.get('/groups', getGroups);
 router.post('/groups', validate(createGroupSchema), createGroup);
 router.delete('/groups/:groupId', deleteGroup);
 router.post('/groups/:groupId/expenses', validate(addExpenseSchema), addExpense);
 router.post('/groups/:groupId/settlements', validate(addSettlementSchema), addSettlement);
+
+// Member management
+router.post('/groups/:groupId/invites', validate(inviteMemberSchema), inviteMember);
+router.post('/groups/:groupId/leave', leaveGroup);
+router.delete('/groups/:groupId/members/:memberId', removeMember);
 
 // Trip-mode UPI Drafts & Polls
 router.get('/groups/:groupId/upi-drafts', getUpiDrafts);
