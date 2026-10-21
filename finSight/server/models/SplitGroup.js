@@ -20,6 +20,14 @@ const personalSyncSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const customShareSchema = new mongoose.Schema(
+  {
+    memberId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    amount: { type: Number, min: 0, default: 0 },
+  },
+  { _id: false }
+);
+
 const splitExpenseSchema = new mongoose.Schema(
   {
     description: { type: String, required: true, trim: true },
@@ -33,6 +41,7 @@ const splitExpenseSchema = new mongoose.Schema(
     personalTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     personalSync: [personalSyncSchema],
+    customShares: [customShareSchema],
     receiptKey: { type: String, trim: true },
     receiptUploadedAt: { type: Date },
   },

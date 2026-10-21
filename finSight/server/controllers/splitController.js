@@ -46,16 +46,25 @@ const calculateBalances = (group) => {
     const totalPaise = Math.round(Number(expense.amount) * 100);
     balancesPaise[paidBy] += totalPaise;
 
-    const n = participants.length;
-    const basePaise = Math.floor(totalPaise / n);
-    const remainderPaise = totalPaise % n;
+    if (Array.isArray(expense.customShares) && expense.customShares.length > 0) {
+      expense.customShares.forEach((cs) => {
+        const mId = cs.memberId.toString();
+        if (balancesPaise[mId] !== undefined) {
+          balancesPaise[mId] -= Math.round(Number(cs.amount) * 100);
+        }
+      });
+    } else {
+      const n = participants.length;
+      const basePaise = Math.floor(totalPaise / n);
+      const remainderPaise = totalPaise % n;
 
-    participants.forEach((memberId, idx) => {
-      if (balancesPaise[memberId] !== undefined) {
-        const sharePaise = basePaise + (idx < remainderPaise ? 1 : 0);
-        balancesPaise[memberId] -= sharePaise;
-      }
-    });
+      participants.forEach((memberId, idx) => {
+        if (balancesPaise[memberId] !== undefined) {
+          const sharePaise = basePaise + (idx < remainderPaise ? 1 : 0);
+          balancesPaise[memberId] -= sharePaise;
+        }
+      });
+    }
   });
 
   group.settlements.forEach((settlement) => {

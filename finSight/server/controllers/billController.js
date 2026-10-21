@@ -481,6 +481,11 @@ exports.finalizeBill = async (req, res) => {
     const expenseDate = bill.date || new Date();
     const totalRupees = breakdown.total / 100;
 
+    const customSharesList = expenseParticipants.map((mId) => ({
+      memberId: mId,
+      amount: (breakdown.shares[mId]?.totalShare || 0) / 100,
+    }));
+
     const newExpense = group.expenses.create({
       description: bill.title,
       amount: totalRupees,
@@ -492,6 +497,7 @@ exports.finalizeBill = async (req, res) => {
       personalShareAmount: 0,
       createdBy: req.user.id,
       personalSync: [],
+      customShares: customSharesList,
       receiptKey: bill.receiptKey || undefined,
       receiptUploadedAt: bill.receiptUploadedAt || (bill.receiptKey ? new Date() : undefined),
     });
