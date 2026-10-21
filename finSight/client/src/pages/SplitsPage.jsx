@@ -7,10 +7,16 @@ import UpiSettlementModal from '../components/UpiSettlementModal.jsx';
 import PayAndSplitModal from '../components/PayAndSplitModal.jsx';
 import Button from '../components/Button.jsx';
 import ReceiptThumbnail from '../components/ReceiptThumbnail.jsx';
+import ItemClaimModal from '../components/ItemClaimModal.jsx';
 import api from '../api/axios.js';
 import useAuth from '../hooks/useAuth.js';
 
 const today = new Date().toISOString().slice(0, 10);
+
+const resolveMemberName = (group, memberId) => {
+  const member = (group?.members || []).find((m) => m._id?.toString() === memberId?.toString());
+  return member?.name || 'Member';
+};
 
 const emptyGroupForm = {
   name: '',
@@ -119,6 +125,10 @@ const SplitsPage = () => {
     syncPersonal: true,
   });
 
+  const [bills, setBills] = useState([]);
+  const [selectedBillId, setSelectedBillId] = useState(null);
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+
   const fetchDrafts = async (groupId) => {
     if (!groupId) return;
     try {
@@ -131,9 +141,22 @@ const SplitsPage = () => {
     }
   };
 
+  const fetchBills = async (groupId) => {
+    if (!groupId) return;
+    try {
+      const res = await api.get(`/splits/groups/${groupId}/bills`);
+      if (res.data?.success) {
+        setBills(res.data.data || []);
+      }
+    } catch (e) {
+      console.warn('Could not load bills:', e.message);
+    }
+  };
+
   useEffect(() => {
     if (selectedGroupId) {
       fetchDrafts(selectedGroupId);
+      fetchBills(selectedGroupId);
     }
   }, [selectedGroupId]);
 
@@ -532,7 +555,15 @@ const SplitsPage = () => {
       </div>
 
       {/* Trip Mode Banner & Settlement Tool */}
-      <TripModeWidget onTripChanged={() => fetchGroups()} />
+      <TripModeWidget
+        onTripChanged={() => {
+          fetchGroups();
+          if (selectedGroupId) {
+            fetchDrafts(selectedGroupId);
+            fetchBills(selectedGroupId);
+          }
+        }}
+      />
 
       {/* Pending Group Invites Banner */}
       {pendingInvites.length > 0 && (
@@ -809,6 +840,98 @@ const SplitsPage = () => {
                   </div>
                 </div>
               </Card>
+
+              {/* Active Itemized Bills ("Split by Items") */}
+              {bills.filter((b) => b.status === 'claiming').length > 0 && (
+                <Card style={{ padding: '1.1rem 1.3rem', border: '1px solid rgba(99, 102, 241, 0.4)', background: 'rgba(99, 102, 241, 0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>🧾</span>
+                      <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Active Itemized Bills ({bills.filter((b) => b.status === 'claiming').length})
+                      </h3>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Collaborative item claiming · integer-paise split
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {bills.filter((b) => b.status === 'claiming').map((bill) => {
+                      const totalClaimedUnits = (bill.items || []).reduce(
+                        (sum, it) => sum + (it.claims || []).reduce((s, c) => s + (Number(c.units) || 0), 0),
+                        0
+                      );
+                      const totalUnits = (bill.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0);
+
+                      return (
+                        <div
+                          key={bill._id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem',
+                            padding: '0.85rem 1rem',
+                            borderRadius: 'var(--radius-sm, 8px)',
+                            background: 'var(--bg-surface, #FFFFFF)',
+                            border: '1px solid var(--border-color)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {bill.receiptKey && (
+                              <ReceiptThumbnail
+                                groupId={selectedGroup._id}
+                                receiptKey={bill.receiptKey}
+                                size="md"
+                                alt={`Receipt for ${bill.title}`}
+                              />
+                            )}
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 700,
+                                    padding: '2px 7px',
+                                    borderRadius: 4,
+                                    background: 'var(--accent-primary, #6366F1)',
+                                    color: '#fff',
+                                  }}
+                                >
+                                  BY ITEMS
+                                </span>
+                                <span style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                                  {bill.title}
+                                </span>
+                                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary, #6366F1)' }}>
+                                  ₹{Number(bill.total).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                                {bill.items?.length || 0} line items · {totalClaimedUnits}/{totalUnits} units claimed · Paid by {resolveMemberName(selectedGroup, bill.paidBy)}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Button
+                              type="button"
+                              variant="primary"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedBillId(bill._id);
+                                setIsClaimModalOpen(true);
+                              }}
+                            >
+                              Claim Items
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
 
               {/* Captured UPI Drafts (Always Draft, never auto-saved) */}
               {drafts.length > 0 && (
@@ -1846,6 +1969,25 @@ const SplitsPage = () => {
           else fetchGroups();
         }}
       />
+
+      {isClaimModalOpen && selectedBillId && (
+        <ItemClaimModal
+          isOpen={isClaimModalOpen}
+          onClose={() => {
+            setIsClaimModalOpen(false);
+            setSelectedBillId(null);
+          }}
+          trip={selectedGroup}
+          billId={selectedBillId}
+          onBillFinalized={() => {
+            fetchGroups();
+            if (selectedGroupId) {
+              fetchBills(selectedGroupId);
+              fetchDrafts(selectedGroupId);
+            }
+          }}
+        />
+      )}
     </>
   );
 };

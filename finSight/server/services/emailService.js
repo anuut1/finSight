@@ -246,9 +246,66 @@ async function sendGroupInviteEmailViaSes({ toEmail, inviterName, groupName, isT
   });
 }
 
+/**
+ * Send an email notifying a group member that an itemized bill has been published for claims.
+ */
+async function sendBillPublishedEmailViaSes({ toEmail, hostName, groupName, billTitle, billTotal }) {
+  const appUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const splitsUrl = `${appUrl}/splits`;
+
+  const subject = `🧾 Claim your items for "${billTitle}" in ${groupName}`;
+  const textBody = `Hi,\n\n${hostName || 'The host'} published an itemized bill "${billTitle}" (Total: ₹${billTotal}) for "${groupName}".\n\nPlease open FinSight to claim the items you had:\n${splitsUrl}\n\nBest regards,\nThe FinSight Team`;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Itemized Bill Published</title>
+</head>
+<body style="background-color: #0B1120; color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; margin: 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #1E293B; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
+    <tr>
+      <td style="padding: 32px 32px 20px 32px; background: linear-gradient(135deg, #10B981 0%, #059669 100%); text-align: center;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700;">FinSight</h1>
+        <p style="margin: 8px 0 0 0; color: #D1FAE5; font-size: 14px;">Itemized Bill Split</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 32px;">
+        <h2 style="margin: 0 0 16px 0; color: #F8FAFC; font-size: 20px;">Claim your items: ${billTitle} 🧾</h2>
+        <p style="color: #94A3B8; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+          <strong>${hostName || 'A group member'}</strong> published an itemized bill of <strong>₹${billTotal}</strong> for <strong>"${groupName}"</strong>.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${splitsUrl}" style="background-color: #10B981; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+            Open FinSight & Claim Items
+          </a>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 20px 32px; background-color: #0F172A; text-align: center; font-size: 12px; color: #64748B;">
+        Sent securely via Amazon Simple Email Service (SES).
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  return sendTransactionalEmailViaSes({
+    toEmail,
+    subject,
+    htmlBody,
+    textBody,
+  });
+}
+
 module.exports = {
   sendTransactionalEmailViaSes,
   sendWelcomeEmailViaSes,
   sendFriendInviteEmailViaSes,
   sendGroupInviteEmailViaSes,
+  sendBillPublishedEmailViaSes,
 };

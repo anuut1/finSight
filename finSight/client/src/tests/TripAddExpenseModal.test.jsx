@@ -411,4 +411,67 @@ describe('TripAddExpenseModal Component', () => {
       expect(handleClose).toHaveBeenCalled();
     });
   });
+
+  it('allows adding manual items, shows host review table with live total check, and publishes bill', async () => {
+    api.post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: { _id: 'bill123', title: 'Pizza Dinner', total: 600, status: 'claiming' },
+      },
+    });
+
+    const handleAdded = vi.fn();
+    const handleClose = vi.fn();
+
+    render(
+      <TripAddExpenseModal
+        isOpen={true}
+        onClose={handleClose}
+        trip={mockTrip}
+        onAdded={handleAdded}
+      />
+    );
+
+    // Click "+ Add items manually"
+    fireEvent.click(screen.getByRole('button', { name: /Add items manually/i }));
+
+    // Segment should switch to By items
+    expect(screen.getByRole('button', { name: /By items/i })).not.toBeDisabled();
+    expect(screen.getByText(/Host Review: Line items/i)).toBeInTheDocument();
+
+    // Fill in item row
+    fireEvent.change(screen.getByLabelText(/What was it for/i), { target: { value: 'Pizza Dinner' } });
+    fireEvent.change(screen.getByLabelText(/Item 1 name/i), { target: { value: 'Margherita Pizza' } });
+    fireEvent.change(screen.getByLabelText(/Item 1 price/i), { target: { value: '550' } });
+
+    // Set Tax
+    fireEvent.change(screen.getByLabelText(/Tax/i), { target: { value: '50' } });
+
+    // Live total check: 550 + 50 = 600. Update Amount field
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '600' } });
+    expect(screen.getByText(/Totals match perfectly/i)).toBeInTheDocument();
+
+    // Submit
+    fireEvent.click(screen.getByRole('button', { name: /Publish bill for claiming/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/splits/groups/trip123/bills',
+        expect.objectContaining({
+          title: 'Pizza Dinner',
+          total: 600,
+          tax: 50,
+          items: [
+            expect.objectContaining({
+              name: 'Margherita Pizza',
+              qty: 1,
+              price: 550,
+            }),
+          ],
+        })
+      );
+      expect(handleAdded).toHaveBeenCalled();
+      expect(handleClose).toHaveBeenCalled();
+    });
+  });
 });

@@ -23,9 +23,25 @@ const {
   removeMember,
   getGroupReceiptUrl,
 } = require('../controllers/splitController');
+const {
+  createBill,
+  getBills,
+  getBillById,
+  claimBillItems,
+  finalizeBill,
+  cancelBill,
+} = require('../controllers/billController');
 const { validate, z } = require('../middleware/validate');
+const { rateLimit } = require('express-rate-limit');
 
 const router = express.Router();
+
+const billActionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const createGroupSchema = z.object({
   name: z.string().trim().min(1, 'Group name is required'),
@@ -102,6 +118,59 @@ const inviteMemberSchema = z
     message: 'Must provide either an email or friendUserId',
   });
 
+const createBillSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').optional(),
+  paidBy: z.string().min(1, 'paidBy member is required'),
+  items: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, 'Item name is required'),
+        qty: z.coerce.number().positive().default(1),
+        price: z.coerce.number().min(0, 'Item price cannot be negative'),
+      })
+    )
+    .min(1, 'At least one line item is required'),
+  tax: z.coerce.number().min(0).optional(),
+  serviceCharge: z.coerce.number().min(0).optional(),
+  tip: z.coerce.number().min(0).optional(),
+  discount: z.coerce.number().min(0).optional(),
+  total: z.coerce.number().min(0).optional(),
+  unclaimedPolicy: z.enum(['split_equally', 'host_absorbs']).optional(),
+  nonResponderPolicy: z.enum(['split_among_non_responders', 'split_equally', 'host_absorbs']).optional(),
+  receiptKey: z.string().trim().optional(),
+  date: z.union([z.string(), z.date()]).optional(),
+  category: z.string().optional(),
+  syncPersonal: z.boolean().optional(),
+});
+
+const claimBillSchema = z.object({
+  itemId: z.string().optional(),
+  units: z.coerce.number().min(0).optional(),
+  claims: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        units: z.coerce.number().min(0),
+      })
+    )
+    .optional(),
+});
+
+const finalizeBillSchema = z.object({
+  unclaimedPolicy: z.enum(['split_equally', 'host_absorbs']).optional(),
+  nonResponders: z.array(z.string()).optional(),
+  nonResponderPolicy: z.enum(['split_among_non_responders', 'split_equally', 'host_absorbs']).optional(),
+  assignments: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        claimantId: z.string().min(1),
+        units: z.coerce.number().min(0),
+      })
+    )
+    .optional(),
+});
+
 router.get('/trips/active', getActiveTrip);
 router.post('/trips/start', validate(startTripSchema), startTrip);
 router.post('/trips/:groupId/end', endTrip);
@@ -130,6 +199,14 @@ router.post('/groups/:groupId/upi-drafts/:draftId/assign', assignUpiDraft);
 router.post('/groups/:groupId/upi-drafts/:draftId/dismiss', dismissUpiDraft);
 router.post('/groups/:groupId/upi-drafts/:draftId/poll/respond', respondToDraftPoll);
 router.post('/groups/:groupId/upi-drafts/:draftId/poll/close', closeDraftPoll);
+
+// Itemized Bills ("Split by Items")
+router.get('/groups/:groupId/bills', billActionLimiter, getBills);
+router.post('/groups/:groupId/bills', billActionLimiter, validate(createBillSchema), createBill);
+router.get('/groups/:groupId/bills/:billId', billActionLimiter, getBillById);
+router.post('/groups/:groupId/bills/:billId/claim', billActionLimiter, validate(claimBillSchema), claimBillItems);
+router.post('/groups/:groupId/bills/:billId/finalize', billActionLimiter, validate(finalizeBillSchema), finalizeBill);
+router.post('/groups/:groupId/bills/:billId/cancel', billActionLimiter, cancelBill);
 
 // Trip receipts presigned view URL (active members only)
 router.get(

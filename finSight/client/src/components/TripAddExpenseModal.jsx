@@ -10,6 +10,10 @@ const today = () => new Date().toISOString().slice(0, 10);
 /**
  * One-step "Add expense" for an active trip.
  * Defaults: paid by the host, split equally among everyone. Just type what and how much.
+ * Supports:
+ * - Pick people (standard equal split)
+ * - Ask everyone (Poll mode)
+ * - Split by items (Itemized bill review & claims)
  * Supports receipt photo/image attachment with automatic Textract OCR extraction and graceful fallback.
  */
 const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded }) => {
@@ -31,6 +35,14 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
   const [scanSummary, setScanSummary] = useState(null);
   const [scanFailed, setScanFailed] = useState(false);
 
+  // Line items for "Split by items" host review
+  const [items, setItems] = useState([]);
+  const [tax, setTax] = useState(0);
+  const [serviceCharge, setServiceCharge] = useState(0);
+  const [tip, setTip] = useState(0);
+  const [discount, setDiscount] = useState(0);
+  const [unclaimedPolicy, setUnclaimedPolicy] = useState('split_equally');
+
   const cameraInputRef = useRef(null);
   const uploadInputRef = useRef(null);
 
@@ -49,6 +61,11 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
     setReceiptPreviewUrl('');
     setReceiptKey('');
     setExtractedItems([]);
+    setItems([]);
+    setTax(0);
+    setServiceCharge(0);
+    setTip(0);
+    setDiscount(0);
     setScanSummary(null);
     setScanFailed(false);
     resetScan();
@@ -69,6 +86,12 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
     setDate(today());
     setPaidBy(ids[0] || '');
     setSplitBetween(ids);
+    setItems([]);
+    setTax(0);
+    setServiceCharge(0);
+    setTip(0);
+    setDiscount(0);
+    setUnclaimedPolicy('split_equally');
     setError('');
   }, [isOpen, trip?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -104,7 +127,20 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
         }
         if (Array.isArray(res.items) && res.items.length > 0) {
           setExtractedItems(res.items);
+          setItems(
+            res.items.map((it, idx) => ({
+              id: `item_${Date.now()}_${idx}`,
+              name: it.name || `Item ${idx + 1}`,
+              qty: Math.max(1, Number(it.qty) || 1),
+              price: Number(it.price) || 0,
+            }))
+          );
         }
+        setTax(Number(res.tax) || 0);
+        setServiceCharge(Number(res.serviceCharge) || 0);
+        setTip(Number(res.tip) || 0);
+        setDiscount(Number(res.discount) || 0);
+
         setScanSummary({
           itemsCount: (res.items || []).length,
           tax: res.tax || 0,
@@ -119,21 +155,103 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
     }
   };
 
+  const handleAddManualItems = () => {
+    if (items.length === 0) {
+      setItems([{ id: `item_${Date.now()}_0`, name: '', qty: 1, price: '' }]);
+    }
+    setSplitMode('items');
+  };
+
+  const handleItemChange = (index, field, value) => {
+    setItems((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const handleAddItemRow = () => {
+    setItems((prev) => [
+      ...prev,
+      { id: `item_${Date.now()}_${prev.length}`, name: '', qty: 1, price: '' },
+    ]);
+  };
+
+  const handleRemoveItemRow = (index) => {
+    setItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   const toggle = (id) =>
     setSplitBetween((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const allSelected = members.length > 0 && splitBetween.length === members.length;
   const share = splitBetween.length && Number(amount) > 0 ? Number(amount) / splitBetween.length : 0;
 
+  // Calculation for items review
+  const itemsSum = items.reduce((sum, it) => sum + (Number(it.price) || 0), 0);
+  const computedTotal = Math.max(
+    0,
+    itemsSum + Number(tax || 0) + Number(serviceCharge || 0) + Number(tip || 0) - Number(discount || 0)
+  );
+  const hasDiscrepancy =
+    splitMode === 'items' &&
+    amount !== '' &&
+    Math.abs(computedTotal - Number(amount)) > 0.01;
+
+  const isItemsModeAvailable = extractedItems.length > 0 || items.length > 0;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!description.trim()) return setError('Add a short description, e.g. "Lunch".');
-    if (!(Number(amount) > 0)) return setError('Enter a valid amount.');
+    if (splitMode !== 'items' && !(Number(amount) > 0)) return setError('Enter a valid amount.');
     setSaving(true);
     setError('');
 
     try {
-      if (splitMode === 'poll') {
+      if (splitMode === 'items') {
+        if (items.length === 0) {
+          setSaving(false);
+          return setError('Add at least one line item to split by items.');
+        }
+
+        for (let i = 0; i < items.length; i++) {
+          if (!items[i].name || !items[i].name.trim()) {
+            setSaving(false);
+            return setError(`Line item #${i + 1} needs a name.`);
+          }
+          if (items[i].price === '' || isNaN(Number(items[i].price)) || Number(items[i].price) < 0) {
+            setSaving(false);
+            return setError(`Line item #${i + 1} has an invalid price.`);
+          }
+        }
+
+        const effectiveTotal = computedTotal > 0 ? computedTotal : Number(amount);
+
+        const billRes = await api.post(`/splits/groups/${trip._id}/bills`, {
+          title: description.trim(),
+          paidBy,
+          items: items.map((it) => ({
+            name: it.name.trim(),
+            qty: Math.max(1, Math.round(Number(it.qty) || 1)),
+            price: Number(it.price) || 0,
+          })),
+          tax: Number(tax) || 0,
+          serviceCharge: Number(serviceCharge) || 0,
+          tip: Number(tip) || 0,
+          discount: Number(discount) || 0,
+          total: effectiveTotal,
+          unclaimedPolicy,
+          receiptKey: receiptKey || undefined,
+          date: date || today(),
+          category: 'Dining',
+          syncPersonal: true,
+        });
+
+        if (billRes.data?.data) {
+          if (onAdded) onAdded(billRes.data.data);
+          onClose();
+        }
+      } else if (splitMode === 'poll') {
         const draftRes = await api.post(`/splits/groups/${trip._id}/upi-drafts`, {
           amount: Number(amount),
           merchant: description.trim(),
@@ -227,8 +345,12 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
           <button
             type="button"
             onClick={() => setSplitMode('items')}
-            disabled={extractedItems.length === 0}
-            title={extractedItems.length > 0 ? 'Split items individually' : 'Attach a receipt with items to split by item'}
+            disabled={!isItemsModeAvailable}
+            title={
+              isItemsModeAvailable
+                ? 'Split items individually'
+                : 'Attach a receipt with items to split by item'
+            }
             style={{
               flex: 1,
               padding: '7px 8px',
@@ -239,11 +361,11 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
               color:
                 splitMode === 'items'
                   ? '#fff'
-                  : extractedItems.length === 0
+                  : !isItemsModeAvailable
                   ? 'var(--text-muted, #64748b)'
                   : 'var(--text-secondary)',
-              cursor: extractedItems.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: extractedItems.length === 0 ? 0.5 : 1,
+              cursor: !isItemsModeAvailable ? 'not-allowed' : 'pointer',
+              opacity: !isItemsModeAvailable ? 0.5 : 1,
               transition: 'all 0.15s ease',
             }}
           >
@@ -279,7 +401,7 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
           />
 
           {!receiptFile ? (
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <Button
                 type="button"
                 variant="secondary"
@@ -298,6 +420,17 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
               >
                 📁 Upload image
               </Button>
+              {items.length === 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAddManualItems}
+                  aria-label="Add items manually"
+                >
+                  + Add items manually
+                </Button>
+              )}
             </div>
           ) : (
             <div
@@ -412,10 +545,30 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
             placeholder="Lunch"
           />
         </div>
+
         <div style={field}>
-          <label htmlFor="trip-exp-amt" style={label}>
-            Amount ({symbol})
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label htmlFor="trip-exp-amt" style={label}>
+              Amount ({symbol})
+            </label>
+            {splitMode === 'items' && hasDiscrepancy && (
+              <button
+                type="button"
+                onClick={() => setAmount(String(computedTotal))}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-primary, #6366F1)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Match items total ({symbol}{computedTotal})
+              </button>
+            )}
+          </div>
           <input
             id="trip-exp-amt"
             className="form-input"
@@ -428,6 +581,7 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
             placeholder="600"
           />
         </div>
+
         <div style={field}>
           <label htmlFor="trip-exp-date" style={label}>
             Date
@@ -440,6 +594,7 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
             onChange={(e) => setDate(e.target.value)}
           />
         </div>
+
         <div style={field}>
           <label htmlFor="trip-exp-paid" style={label}>
             Paid by
@@ -453,6 +608,7 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
           </select>
         </div>
 
+        {/* Pick People Mode */}
         {splitMode === 'pick' && (
           <div style={field}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -493,6 +649,7 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
           </div>
         )}
 
+        {/* Poll Mode */}
         {splitMode === 'poll' && (
           <div
             style={{
@@ -515,23 +672,204 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
           </div>
         )}
 
+        {/* Split by Items Host Review Step */}
         {splitMode === 'items' && (
           <div
             style={{
-              padding: '0.85rem 1rem',
-              borderRadius: 'var(--radius-md, 8px)',
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
+              gap: '12px',
+              padding: '1rem',
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-surface-elevated, rgba(255,255,255,0.02))',
+              border: '1px solid var(--border-color)',
             }}
           >
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-success, #10B981)' }}>
-              🧾 Split By Items Mode
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  🧾 Host Review: Line items ({items.length})
+                </span>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  Review & edit items before publishing to group members for claiming.
+                </div>
+              </div>
+              <Button type="button" variant="secondary" size="sm" onClick={handleAddItemRow}>
+                + Add item
+              </Button>
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-              {extractedItems.length} items extracted from receipt. You will be able to review line items, tax, and service charges before publishing the claim screen to members.
+
+            {/* Editable item rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {items.map((it, idx) => (
+                <div
+                  key={it.id || idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <input
+                    className="form-input"
+                    style={{ flex: 1, fontSize: '0.82rem', padding: '6px 8px' }}
+                    placeholder="Item name"
+                    value={it.name}
+                    onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                    aria-label={`Item ${idx + 1} name`}
+                  />
+                  <input
+                    className="form-input"
+                    style={{ width: '56px', fontSize: '0.82rem', padding: '6px 6px', textAlign: 'center' }}
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Qty"
+                    value={it.qty}
+                    onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
+                    aria-label={`Item ${idx + 1} quantity`}
+                  />
+                  <input
+                    className="form-input"
+                    style={{ width: '85px', fontSize: '0.82rem', padding: '6px 8px', textAlign: 'right' }}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Price"
+                    value={it.price}
+                    onChange={(e) => handleItemChange(idx, 'price', e.target.value)}
+                    aria-label={`Item ${idx + 1} price`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    style={{ padding: '4px 8px' }}
+                    onClick={() => handleRemoveItemRow(idx)}
+                    aria-label={`Remove item ${idx + 1}`}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Charges and Discounts row */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '8px',
+                paddingTop: '8px',
+                borderTop: '1px solid var(--border-color)',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label htmlFor="bill-tax-input" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Tax ({symbol})</label>
+                <input
+                  id="bill-tax-input"
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  style={{ fontSize: '0.8rem', padding: '4px 6px' }}
+                  value={tax}
+                  onChange={(e) => setTax(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label htmlFor="bill-service-input" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Service ({symbol})</label>
+                <input
+                  id="bill-service-input"
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  style={{ fontSize: '0.8rem', padding: '4px 6px' }}
+                  value={serviceCharge}
+                  onChange={(e) => setServiceCharge(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label htmlFor="bill-tip-input" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Tip ({symbol})</label>
+                <input
+                  id="bill-tip-input"
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  style={{ fontSize: '0.8rem', padding: '4px 6px' }}
+                  value={tip}
+                  onChange={(e) => setTip(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label htmlFor="bill-discount-input" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Discount ({symbol})</label>
+                <input
+                  id="bill-discount-input"
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  style={{ fontSize: '0.8rem', padding: '4px 6px' }}
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Live Check Warning / Status */}
+            <div
+              style={{
+                padding: '8px 10px',
+                borderRadius: '6px',
+                background: hasDiscrepancy ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                border: `1px solid ${hasDiscrepancy ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '6px',
+                fontSize: '0.76rem',
+              }}
+            >
+              <span
+                style={{
+                  color: hasDiscrepancy ? 'var(--color-warning, #f59e0b)' : 'var(--accent-success, #10B981)',
+                  fontWeight: 600,
+                }}
+              >
+                {hasDiscrepancy
+                  ? `⚠️ Items + charges (${symbol}${computedTotal.toFixed(2)}) ≠ Entered total (${symbol}${Number(amount || 0).toFixed(2)})`
+                  : `✓ Totals match perfectly (${symbol}${computedTotal.toFixed(2)})`}
+              </span>
+              {hasDiscrepancy && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setAmount(String(computedTotal))}
+                >
+                  Match total ({symbol}{computedTotal})
+                </Button>
+              )}
+            </div>
+
+            {/* Unclaimed policy */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label htmlFor="unclaimed-policy" style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                If items remain unclaimed after deadline:
+              </label>
+              <select
+                id="unclaimed-policy"
+                className="form-input"
+                style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                value={unclaimedPolicy}
+                onChange={(e) => setUnclaimedPolicy(e.target.value)}
+              >
+                <option value="split_equally">Split unclaimed items equally among everyone</option>
+                <option value="host_absorbs">Host absorbs unclaimed items</option>
+              </select>
             </div>
           </div>
         )}
@@ -546,7 +884,11 @@ const TripAddExpenseModal = ({ isOpen, onClose, trip, symbol = '₹', onAdded })
             Cancel
           </Button>
           <Button type="submit" loading={saving}>
-            {splitMode === 'poll' ? 'Start Poll' : splitMode === 'items' ? 'Continue with items' : 'Add expense'}
+            {splitMode === 'poll'
+              ? 'Start Poll'
+              : splitMode === 'items'
+              ? 'Publish bill for claiming'
+              : 'Add expense'}
           </Button>
         </div>
       </form>

@@ -165,6 +165,8 @@ const serializeGroup = (group, currentUserId = null) => {
 /**
  * Get groups where current user is the creator OR an active member.
  */
+exports.serializeGroup = serializeGroup;
+
 exports.getGroups = async (req, res) => {
   try {
     const currentUserId = req.user.id;
