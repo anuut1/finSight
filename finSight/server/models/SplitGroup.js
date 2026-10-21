@@ -33,6 +33,8 @@ const splitExpenseSchema = new mongoose.Schema(
     personalTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     personalSync: [personalSyncSchema],
+    receiptKey: { type: String, trim: true },
+    receiptUploadedAt: { type: Date },
   },
   { timestamps: true }
 );

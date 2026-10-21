@@ -21,6 +21,7 @@ const {
   declineGroupInvite,
   leaveGroup,
   removeMember,
+  getGroupReceiptUrl,
 } = require('../controllers/splitController');
 const { validate, z } = require('../middleware/validate');
 
@@ -49,6 +50,7 @@ const addExpenseSchema = z.object({
   }),
   category: z.string().optional(),
   syncPersonal: z.boolean().optional(),
+  receiptKey: z.string().trim().optional(),
 });
 
 const addSettlementSchema = z.object({
@@ -84,6 +86,7 @@ const createUpiDraftSchema = z
     category: z.string().optional(),
     date: z.union([z.string(), z.date()]).optional(),
     payerVpa: z.string().optional(),
+    receiptKey: z.string().trim().optional(),
   })
   .refine((data) => Boolean(data.amount || (data.rawText && data.rawText.trim())), {
     message: 'Either amount or rawText is required',
@@ -127,5 +130,11 @@ router.post('/groups/:groupId/upi-drafts/:draftId/assign', assignUpiDraft);
 router.post('/groups/:groupId/upi-drafts/:draftId/dismiss', dismissUpiDraft);
 router.post('/groups/:groupId/upi-drafts/:draftId/poll/respond', respondToDraftPoll);
 router.post('/groups/:groupId/upi-drafts/:draftId/poll/close', closeDraftPoll);
+
+// Trip receipts presigned view URL (active members only)
+router.get(
+  ['/groups/:groupId/receipts/:key/url', '/groups/:groupId/receipts/*key/url'],
+  getGroupReceiptUrl
+);
 
 module.exports = router;

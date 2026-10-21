@@ -66,9 +66,10 @@ async function generateReceiptUploadUrl(userId, contentType = 'image/jpeg', expl
  * Generate a pre-signed S3 download/view URL for a private receipt.
  *
  * @param {string} key - S3 object key
- * @returns {Promise<string>} Pre-signed download URL valid for 1 hour
+ * @param {number} [expiresIn=3600] - Expiration in seconds
+ * @returns {Promise<string>} Pre-signed download URL
  */
-async function generateReceiptViewUrl(key) {
+async function generateReceiptViewUrl(key, expiresIn = 3600) {
   if (!key) return null;
 
   const command = new GetObjectCommand({
@@ -76,7 +77,7 @@ async function generateReceiptViewUrl(key) {
     Key: key,
   });
 
-  return getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  return getSignedUrl(s3Client, command, { expiresIn });
 }
 
 /**

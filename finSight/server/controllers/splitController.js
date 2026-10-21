@@ -3,6 +3,8 @@ const SplitGroup = require('../models/SplitGroup');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const UpiDraft = require('../models/UpiDraft');
+const Receipt = require('../models/Receipt');
+const { generateReceiptViewUrl } = require('../services/s3Service');
 const { cleanAndCategorizeExpense } = require('../services/bedrockService');
 const { parseBankAlertHeuristics } = require('../services/bankAlertParser');
 const {
@@ -264,6 +266,7 @@ exports.addExpense = async (req, res) => {
       date,
       category = 'Shared',
       syncPersonal = true,
+      receiptKey,
     } = req.body;
 
     if (!description || !amount || !paidBy || !date || !splitBetween.length) {
@@ -301,6 +304,8 @@ exports.addExpense = async (req, res) => {
       personalShareAmount: perMemberShare,
       createdBy: req.user.id,
       personalSync: [],
+      receiptKey: receiptKey || undefined,
+      receiptUploadedAt: receiptKey ? new Date() : undefined,
     });
 
     // Create personal transaction for EACH participant linked to a user account
@@ -1051,7 +1056,7 @@ exports.getUpiDrafts = async (req, res) => {
 exports.createUpiDraft = async (req, res) => {
   try {
     const { groupId } = req.params;
-    let { amount, rawText, upiRef, merchant, category, date, payerVpa } = req.body;
+    let { amount, rawText, upiRef, merchant, category, date, payerVpa, receiptKey } = req.body;
 
     const { group, access } = await findGroupWithAccess(groupId, req.user.id);
     if (!group) {
@@ -1092,6 +1097,8 @@ exports.createUpiDraft = async (req, res) => {
       upiRef: upiRef || '',
       payerVpa: payerVpa || '',
       status: 'pending_assignment',
+      receiptKey: receiptKey || undefined,
+      receiptUploadedAt: receiptKey ? new Date() : undefined,
     });
 
     await draft.save();
@@ -1192,6 +1199,8 @@ exports.assignUpiDraft = async (req, res) => {
       personalShareAmount: perMemberShare,
       createdBy: req.user.id,
       personalSync: [],
+      receiptKey: draft.receiptKey || undefined,
+      receiptUploadedAt: draft.receiptUploadedAt || (draft.receiptKey ? new Date() : undefined),
     });
 
     // Create isolated personal transaction for EACH participant linked to a user account
@@ -1361,6 +1370,8 @@ exports.closeDraftPoll = async (req, res) => {
       personalShareAmount: perMemberShare,
       createdBy: req.user.id,
       personalSync: [],
+      receiptKey: draft.receiptKey || undefined,
+      receiptUploadedAt: draft.receiptUploadedAt || (draft.receiptKey ? new Date() : undefined),
     });
 
     // Create isolated personal transaction for participants with integer paise share
@@ -1427,5 +1438,111 @@ exports.closeDraftPoll = async (req, res) => {
   } catch (err) {
     console.error('Error closing draft poll:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+/**
+ * GET /splits/groups/:groupId/receipts/:key/url
+ * Returns a short-lived presigned GET URL for a receipt object.
+ * Accessible only to active group members (strangers get 404).
+ * Validates key format (JPEG/PNG/PDF), prevents path traversal, and ensures key belongs to this group.
+ */
+exports.getGroupReceiptUrl = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    let key = Array.isArray(req.params.key) ? req.params.key.join('/') : req.params.key;
+
+    if (!key && req.query.key) {
+      key = req.query.key;
+    }
+
+    if (!key || typeof key !== 'string') {
+      return res.status(400).json({ success: false, message: 'Receipt key is required' });
+    }
+
+    // Path traversal check
+    if (key.includes('..') || key.includes('\\') || key.startsWith('/')) {
+      return res.status(400).json({ success: false, message: 'Invalid receipt key path' });
+    }
+
+    // File type validation (JPEG/PNG/PDF)
+    const allowedExt = /\.(jpe?g|png|pdf)$/i;
+    if (!allowedExt.test(key)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid receipt file type. Only JPEG, PNG, or PDF are allowed.',
+      });
+    }
+
+    // Member access check via splitAccess (strangers get 404)
+    const { group, access } = await findGroupWithAccess(groupId, req.user.id);
+    if (!group || !access.hasAccess) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    // Verify key belongs to this group
+    const activeMemberUserIds = (group.members || [])
+      .filter((m) => m.userId && m.status === 'active')
+      .map((m) => m.userId.toString());
+    if (group.userId) {
+      activeMemberUserIds.push(group.userId.toString());
+    }
+
+    const belongsToExpenses = (group.expenses || []).some((e) => e.receiptKey === key);
+    let belongsToGroup = belongsToExpenses;
+
+    if (!belongsToGroup) {
+      const draftExists = await UpiDraft.exists({ tripId: group._id, receiptKey: key });
+      if (draftExists) belongsToGroup = true;
+    }
+
+    if (!belongsToGroup) {
+      const receiptDoc = await Receipt.findOne({ s3Key: key });
+      if (receiptDoc) {
+        if (receiptDoc.tripId && receiptDoc.tripId.toString() === group._id.toString()) {
+          belongsToGroup = true;
+        } else if (receiptDoc.userId && activeMemberUserIds.includes(receiptDoc.userId.toString())) {
+          belongsToGroup = true;
+        }
+      }
+    }
+
+    // Also allow active group members who just uploaded a receipt under their own userId path
+    if (!belongsToGroup) {
+      const userPrefixMatch = activeMemberUserIds.some((uid) => key.startsWith(`receipts/${uid}/`));
+      if (userPrefixMatch) {
+        belongsToGroup = true;
+      }
+    }
+
+    if (!belongsToGroup) {
+      return res.status(404).json({
+        success: false,
+        message: 'Receipt not found in this group',
+      });
+    }
+
+    // Generate short-lived presigned GET URL (15 minutes / 900 seconds)
+    const viewUrl = await generateReceiptViewUrl(key, 900);
+    if (!viewUrl) {
+      return res.status(404).json({
+        success: false,
+        message: 'Receipt not found or unavailable',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        url: viewUrl,
+        viewUrl,
+        key,
+        expiresIn: 900,
+        notice: 'Receipt available for 30 days',
+      },
+    });
+  } catch (err) {
+    console.error('Error generating group receipt URL:', err.message);
+    return res.status(500).json({ success: false, message: 'Could not generate receipt URL' });
   }
 };

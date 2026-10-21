@@ -32,6 +32,8 @@ const upiDraftSchema = new mongoose.Schema(
       closed: { type: Boolean, default: false },
       closedAt: { type: Date },
     },
+    receiptKey: { type: String, trim: true },
+    receiptUploadedAt: { type: Date },
   },
   { timestamps: true }
 );
