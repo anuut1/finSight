@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import api from '../api/axios';
 import Button from './Button.jsx';
+import { reencodeImageToJpeg } from '../utils/receiptImage';
+import useReceiptScan from '../hooks/useReceiptScan';
 
 const CATEGORIES = [
   'Food & Dining',
@@ -15,93 +17,20 @@ const CATEGORIES = [
   'Other',
 ];
 
-/**
- * Re-encode any selected image file to JPEG via canvas.
- * - Caps max dimension on the long side to ~2000px
- * - Preserves EXIF orientation where modern browser decodes it
- * - JPEG quality ~0.85
- * - Converts HEIC/HEIF or other formats if browser decodes it, or fails clearly
- */
-const reencodeImageToJpeg = (file) => {
-  return new Promise((resolve, reject) => {
-    // If it's a PDF, Textract natively supports PDF documents up to 10MB
-    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      return resolve(file);
-    }
-
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      try {
-        let width = img.naturalWidth || img.width;
-        let height = img.naturalHeight || img.height;
-
-        if (!width || !height) {
-          return reject(new Error("Couldn't read this receipt, try a clearer photo or enter it manually"));
-        }
-
-        const maxDimension = 2000;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-
-        // Draw white background in case of transparent PNG/WebP
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              return reject(new Error("Couldn't read this receipt, try a clearer photo or enter it manually"));
-            }
-            const cleanFileName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
-            const convertedFile = new File([blob], cleanFileName, { type: 'image/jpeg' });
-            resolve(convertedFile);
-          },
-          'image/jpeg',
-          0.85
-        );
-      } catch {
-        reject(new Error("Couldn't read this receipt, try a clearer photo or enter it manually"));
-      }
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(
-        new Error(
-          file.name.match(/\.(heic|heif)$/i)
-            ? "Your browser could not decode this iPhone HEIC photo. Please take a photo as JPEG/PNG or convert it before uploading."
-            : "Couldn't read this receipt, try a clearer photo or enter it manually"
-        )
-      );
-    };
-
-    img.src = objectUrl;
-  });
-};
-
 const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = null }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
-  const [scanning, setScanning] = useState(false);
-  const [scanStatus, setScanStatus] = useState('idle'); // 'idle' | 'uploading' | 'processing' | 'completed' | 'failed'
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState('');
+  const {
+    status: scanStatus,
+    scanning,
+    uploadProgress,
+    error: scanError,
+    scanReceipt,
+    reset: resetScan,
+  } = useReceiptScan({ tripId });
+  const [localError, setLocalError] = useState('');
+  const error = localError || scanError;
+  const setError = (msg) => setLocalError(msg);
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -112,7 +41,8 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     const selected = e.target.files?.[0];
     if (!selected) return;
 
-    setError('');
+    setLocalError('');
+    resetScan();
 
     // Pre-check file size cap
     if (selected.size > 15 * 1024 * 1024) {
@@ -134,8 +64,6 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
       setPreviewUrl(url);
       setDraft(null);
       setSuccess(false);
-      setScanStatus('idle');
-      setUploadProgress(0);
     } catch (procErr) {
       setError(procErr.message || "Couldn't read this receipt, try a clearer photo or enter it manually");
     }
@@ -219,213 +147,40 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     }, 'image/jpeg', 0.9);
   };
 
-  /**
-   * Helper to upload directly to S3 with progress tracking via XMLHttpRequest
-   */
-  const uploadToS3WithProgress = (uploadUrl, fileToUpload) => {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl, true);
-      xhr.setRequestHeader('Content-Type', fileToUpload.type || 'image/jpeg');
-
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 85);
-          setUploadProgress(percent);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setUploadProgress(100);
-          resolve(true);
-        } else {
-          reject(new Error(`S3 upload failed with HTTP ${xhr.status}`));
-        }
-      };
-
-      xhr.onerror = () => reject(new Error('Network error during S3 direct upload'));
-      xhr.send(fileToUpload);
-    });
-  };
-
-  /**
-   * Polls GET /api/receipts/:id until status is 'completed' or 'failed'
-   */
-  const pollReceiptStatus = async (receiptId, maxAttempts = 22) => {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await new Promise((res) => setTimeout(res, 1500));
-      try {
-        const res = await api.get(`/receipts/${receiptId}`);
-        const data = res.data?.data || res.data;
-        if (!data) continue;
-
-        if (data.status === 'completed') {
-          return {
-            ...data.result,
-            receiptUrl: data.receiptUrl,
-            receiptId: data.receiptId || receiptId,
-          };
-        }
-
-        if (data.status === 'failed') {
-          const err = new Error(data.error?.message || "Couldn't read this receipt, try a clearer photo or enter it manually");
-          err.code = data.error?.code;
-          throw err;
-        }
-      } catch (err) {
-        if (err.code) throw err;
-        console.debug(`[Receipt Polling] Attempt ${attempt + 1} waiting for completion...`);
-      }
-    }
-    return null;
-  };
-
   const handleScanReceipt = async () => {
     if (!file) {
       setError('Please select or drop a receipt image first.');
       return;
     }
 
-    setScanning(true);
-    setScanStatus('uploading');
-    setUploadProgress(5);
-    setError('');
+    setLocalError('');
     setSuccess(false);
 
     try {
-      let scanResult = null;
-
-      // 1. S3 Direct Upload Pipeline
-      if (scanMode === 'auto') {
-        try {
-          const presignRes = await api.post('/receipts/upload-url', {
-            contentType: file.type || 'image/jpeg',
-            fileSize: file.size,
-            tripId: tripId || undefined,
-          });
-
-          // Read fields robustly at both root and nested data levels
-          const payload = presignRes.data?.data || presignRes.data || {};
-          const uploadUrl = payload.uploadUrl || presignRes.data?.uploadUrl;
-          const receiptId = payload.receiptId || presignRes.data?.receiptId;
-          const key = payload.key || presignRes.data?.key;
-          const bucket = payload.bucket || presignRes.data?.bucket;
-
-          if (uploadUrl && key) {
-            // Direct browser-to-S3 upload with live progress tracking
-            await uploadToS3WithProgress(uploadUrl, file);
-            setScanStatus('processing');
-
-            // Check if asynchronous worker produced result
-            if (receiptId) {
-              scanResult = await pollReceiptStatus(receiptId, 15);
-            }
-
-            // If async queue was not yet triggered or polling timed out, call /receipts/analyze-s3
-            if (!scanResult) {
-              const analyzeRes = await api.post('/receipts/analyze-s3', {
-                bucket,
-                key,
-                receiptId,
-                contentType: file.type || 'image/jpeg',
-              });
-              if (analyzeRes.data?.success && (analyzeRes.data.data || analyzeRes.data.items || analyzeRes.data.vendor)) {
-                scanResult = analyzeRes.data.data || analyzeRes.data;
-              }
-            }
-          }
-        } catch (pipelineErr) {
-          console.warn('S3 receipt pipeline encountered error, trying synchronous fallback:', pipelineErr);
-        }
-      }
-
-      // 2. Resilient Direct Fallback: Standard Server Multipart Route
-      if (!scanResult) {
-        setScanStatus('processing');
-        const formData = new FormData();
-        formData.append('receipt', file);
-
-        const res = await api.post('/transactions/receipt/scan', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        if (res.data?.success && (res.data.data || res.data.items || res.data.vendor)) {
-          scanResult = res.data.data || res.data;
-        }
-      }
-
-      if (scanResult) {
-        const rawItems = Array.isArray(scanResult.items)
-          ? scanResult.items.map((it) => ({
-              description: it.description || (it.quantity > 1 ? `${it.quantity}x ${it.name}` : it.name),
-              name: it.name || it.description || 'Receipt Item',
-              quantity: it.quantity || 1,
-              unitPrice: it.unitPrice !== undefined ? Number(it.unitPrice) : (it.quantity > 0 ? Number(it.price || 0) / it.quantity : Number(it.price || 0)),
-              price: Number(it.price || 0),
-              lowConfidence: Boolean(it.lowConfidence),
-            }))
-          : Array.isArray(scanResult.lineItems)
-          ? scanResult.lineItems.map((it) => ({
-              description: it.description || it.name,
-              name: it.name || it.description,
-              quantity: it.quantity || 1,
-              unitPrice: it.unitPrice !== undefined ? Number(it.unitPrice) : Number(it.price || 0),
-              price: Number(it.price || 0),
-              lowConfidence: Boolean(it.lowConfidence),
-            }))
-          : [];
-
-        const subtotal = Number(scanResult.subtotal) || rawItems.reduce((acc, curr) => acc + (curr.price || 0), 0);
-        const tax = Number(scanResult.tax) || 0;
-        const serviceCharge = Number(scanResult.serviceCharge) || 0;
-        const discount = Number(scanResult.discount) || 0;
-        const total = scanResult.total !== undefined ? Number(scanResult.total) : (Number(scanResult.amount) || (subtotal + tax + serviceCharge - discount));
-
-        const expectedTotal = Math.round((subtotal + tax + serviceCharge - discount + Number.EPSILON) * 100) / 100;
-        const isMismatch = scanResult.mismatch !== undefined ? Boolean(scanResult.mismatch) : Math.abs(expectedTotal - total) > 1.0;
-
-        setScanStatus('completed');
+      const data = await scanReceipt(file, { scanMode, tripId, previewUrl });
+      if (data) {
         setDraft({
           type: 'expense',
-          amount: Math.round((total + Number.EPSILON) * 100) / 100,
-          category: scanResult.category || 'Food & Dining',
-          date: scanResult.date || new Date().toISOString().slice(0, 10),
-          description: scanResult.vendor || scanResult.merchant || scanResult.merchantName || 'Receipt Expense',
-          lineItems: rawItems,
-          items: rawItems,
-          subtotal: Math.round((subtotal + Number.EPSILON) * 100) / 100,
-          tax: Math.round((tax + Number.EPSILON) * 100) / 100,
-          serviceCharge: Math.round((serviceCharge + Number.EPSILON) * 100) / 100,
-          discount: Math.round((discount + Number.EPSILON) * 100) / 100,
-          mismatch: isMismatch,
-          lowConfidenceItems: Array.isArray(scanResult.lowConfidenceItems) ? scanResult.lowConfidenceItems : [],
-          source: scanResult.source || 'aws-textract',
-          note: scanResult.note || '',
-          receiptS3Key: scanResult.s3Key || '',
-          receiptUrl: scanResult.receiptUrl || previewUrl,
+          amount: data.amount,
+          category: data.category || 'Food & Dining',
+          date: data.date,
+          description: data.description,
+          lineItems: data.lineItems,
+          items: data.items,
+          subtotal: data.subtotal,
+          tax: data.tax,
+          serviceCharge: data.serviceCharge,
+          discount: data.discount,
+          mismatch: data.mismatch,
+          lowConfidenceItems: data.lowConfidenceItems,
+          source: data.source,
+          note: data.note,
+          receiptS3Key: data.receiptKey || data.receiptS3Key || '',
+          receiptUrl: data.receiptUrl || previewUrl,
         });
-      } else {
-        setScanStatus('failed');
-        setError("Couldn't read this receipt, try a clearer photo or enter it manually");
       }
-    } catch (err) {
-      setScanStatus('failed');
-      const backendMsg = err.response?.data?.message || err.message;
-      const code = err.response?.data?.code || err.code;
-      const requestId = err.response?.data?.requestId;
-      const ACTIONABLE = [
-        'SubscriptionRequiredException', 'AccessDeniedException', 'AccessDenied', 'UnsupportedDocumentException',
-        'DocumentTooLargeException', 'NO_ITEMS_DETECTED', 'NO_DOCUMENT_FOUND', 'UnrecognizedClientException',
-        'InvalidSignatureException', 'ExpiredTokenException', 'CredentialsProviderError', 'UnknownEndpoint',
-        'ThrottlingException', 'InvalidS3ObjectException', 'UNSUPPORTED_FILE_TYPE',
-      ];
-      const generic = "Couldn't read this receipt, try a clearer photo or enter it manually";
-      const specific = backendMsg && (ACTIONABLE.includes(code) || /subscription required/i.test(backendMsg));
-      const suffix = code ? ` (${code}${requestId ? `, ref ${requestId}` : ''})` : '';
-      setError(`${specific ? backendMsg : generic}${suffix}`);
-    } finally {
-      setScanning(false);
+    } catch {
+      // scanReceipt sets status to 'failed' and updates scanError
     }
   };
 
@@ -535,10 +290,9 @@ const ReceiptScannerBox = ({ onTransactionCreated, compact = false, tripId = nul
     setDraft(null);
     setFile(null);
     setPreviewUrl('');
-    setError('');
+    setLocalError('');
+    resetScan();
     setSuccess(false);
-    setScanStatus('idle');
-    setUploadProgress(0);
   };
 
   const handleConfirmAndSave = async (asDraft = false) => {
