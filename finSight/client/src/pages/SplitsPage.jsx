@@ -6,6 +6,7 @@ import TripModeWidget from '../components/TripModeWidget.jsx';
 import UpiSettlementModal from '../components/UpiSettlementModal.jsx';
 import PayAndSplitModal from '../components/PayAndSplitModal.jsx';
 import Button from '../components/Button.jsx';
+import ReceiptThumbnail from '../components/ReceiptThumbnail.jsx';
 import api from '../api/axios.js';
 import useAuth from '../hooks/useAuth.js';
 
@@ -845,20 +846,30 @@ const SplitsPage = () => {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--accent-primary, #6366F1)', color: '#fff' }}>
-                                    POLL IN PROGRESS
-                                  </span>
-                                  <span style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-                                    {draft.cleanMerchant}
-                                  </span>
-                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary, #6366F1)' }}>
-                                    ₹{Number(draft.amount).toLocaleString('en-IN')}
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
-                                  {draft.poll.question}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {draft.receiptKey && (
+                                  <ReceiptThumbnail
+                                    groupId={selectedGroup._id}
+                                    receiptKey={draft.receiptKey}
+                                    size="md"
+                                    alt={`Receipt for ${draft.cleanMerchant}`}
+                                  />
+                                )}
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--accent-primary, #6366F1)', color: '#fff' }}>
+                                      POLL IN PROGRESS
+                                    </span>
+                                    <span style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                                      {draft.cleanMerchant}
+                                    </span>
+                                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-primary, #6366F1)' }}>
+                                      ₹{Number(draft.amount).toLocaleString('en-IN')}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                                    {draft.poll.question}
+                                  </div>
                                 </div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -959,18 +970,28 @@ const SplitsPage = () => {
                             gap: '0.5rem',
                           }}
                         >
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                                {draft.cleanMerchant}
-                              </span>
-                              <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--accent-primary, #6366F1)' }}>
-                                ₹{Number(draft.amount).toLocaleString('en-IN')}
-                              </span>
-                            </div>
-                            <div className="text-muted" style={{ fontSize: '0.74rem' }}>
-                              {draft.date ? new Date(draft.date).toLocaleDateString() : 'Today'} · {draft.category || 'Shared'}
-                              {draft.payerVpa ? ` · ${draft.payerVpa}` : ''}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {draft.receiptKey && (
+                              <ReceiptThumbnail
+                                groupId={selectedGroup._id}
+                                receiptKey={draft.receiptKey}
+                                size="sm"
+                                alt={`Receipt for ${draft.cleanMerchant}`}
+                              />
+                            )}
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                                  {draft.cleanMerchant}
+                                </span>
+                                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--accent-primary, #6366F1)' }}>
+                                  ₹{Number(draft.amount).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                              <div className="text-muted" style={{ fontSize: '0.74rem' }}>
+                                {draft.date ? new Date(draft.date).toLocaleDateString() : 'Today'} · {draft.category || 'Shared'}
+                                {draft.payerVpa ? ` · ${draft.payerVpa}` : ''}
+                              </div>
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '0.45rem' }}>
@@ -1226,6 +1247,7 @@ const SplitsPage = () => {
                         <tr className="text-muted">
                           <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Date</th>
                           <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Description</th>
+                          <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '60px' }}>Receipt</th>
                           <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Paid by</th>
                           <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Split</th>
                           <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>My share</th>
@@ -1239,6 +1261,18 @@ const SplitsPage = () => {
                               {expense.date ? new Date(expense.date).toLocaleDateString() : 'Today'}
                             </td>
                             <td style={{ padding: '0.55rem 0' }}>{expense.description}</td>
+                            <td style={{ padding: '0.55rem 0', textAlign: 'center' }}>
+                              {expense.receiptKey ? (
+                                <ReceiptThumbnail
+                                  groupId={selectedGroup._id}
+                                  receiptKey={expense.receiptKey}
+                                  size="sm"
+                                  alt={`Receipt for ${expense.description}`}
+                                />
+                              ) : (
+                                <span className="text-muted" style={{ fontSize: '0.75rem' }}>—</span>
+                              )}
+                            </td>
                             <td style={{ padding: '0.55rem 0' }}>{expense.paidByName || 'Member'}</td>
                             <td className="text-muted" style={{ padding: '0.55rem 0' }}>
                               {(expense.splitBetweenNames || []).join(', ')}

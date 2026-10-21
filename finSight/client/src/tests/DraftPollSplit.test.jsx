@@ -176,4 +176,65 @@ describe('SplitsPage Component - Draft Opt-In Polls (Phase 4)', () => {
       );
     });
   });
+
+  it('renders receipt thumbnail on poll card and expense row when receiptKey is present', async () => {
+    const pollWithReceipt = {
+      ...mockPollDraft,
+      receiptKey: 'receipts/u1/seafood-poll.jpg',
+    };
+
+    const groupWithReceiptExpense = {
+      ...mockGroup,
+      expenses: [
+        {
+          _id: 'exp-rcpt-99',
+          description: 'Seafood Platter',
+          amount: 1500,
+          paidBy: 'm1',
+          paidByName: 'Alice',
+          splitBetween: ['m1', 'm2'],
+          splitBetweenNames: ['Alice', 'Bob'],
+          date: '2026-03-22',
+          receiptKey: 'receipts/u1/seafood-platter.jpg',
+        },
+      ],
+    };
+
+    api.get.mockImplementation((url) => {
+      if (url === '/splits/groups') {
+        return Promise.resolve({ data: { success: true, data: [groupWithReceiptExpense] } });
+      }
+      if (url === '/splits/groups/g1/upi-drafts') {
+        return Promise.resolve({ data: { success: true, data: [pollWithReceipt] } });
+      }
+      if (url.includes('/receipts/') && url.endsWith('/url')) {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: { url: 'https://s3.mock/receipt-img.jpg?signed=true' },
+          },
+        });
+      }
+      return Promise.resolve({ data: { success: true, data: [] } });
+    });
+
+    render(<SplitsPage />);
+
+    // Wait for poll card thumbnail to appear
+    await waitFor(() => {
+      expect(screen.getByAltText('Receipt for Curlies Beach Shack')).toBeInTheDocument();
+      expect(screen.getByAltText('Receipt for Seafood Platter')).toBeInTheDocument();
+    });
+
+    // Tap thumbnail on poll card to enlarge
+    const pollThumbBtns = screen.getAllByRole('button', { name: /Enlarge receipt thumbnail/i });
+    fireEvent.click(pollThumbBtns[0]);
+
+    // Verify modal is displayed with full view
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByAltText('Enlarged receipt')).toBeInTheDocument();
+      expect(screen.getByText(/Receipt available for 30 days/i)).toBeInTheDocument();
+    });
+  });
 });
