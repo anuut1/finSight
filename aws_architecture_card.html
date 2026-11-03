@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; padding: 40px; display: flex; justify-content: center; align-items: center; min-height: 600px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 32px; width: 1000px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    .header { border-bottom: 2px solid #3b82f6; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+    .title { font-size: 24px; font-weight: 700; color: #60a5fa; }
+    .badge { background: #1e3a8a; color: #93c5fd; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; border: 1px solid #3b82f6; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .tier { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+    .tier-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .tier-title span { color: #f59e0b; }
+    .service-box { background: #1e293b; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+    .service-box.accent-orange { border-left-color: #f97316; }
+    .service-box.accent-green { border-left-color: #10b981; }
+    .service-box.accent-purple { border-left-color: #a855f7; }
+    .service-name { font-size: 15px; font-weight: 700; color: #ffffff; display: flex; justify-content: space-between; }
+    .service-badge { font-size: 11px; background: #334155; color: #cbd5e1; padding: 2px 6px; border-radius: 4px; }
+    .service-desc { font-size: 12px; color: #94a3b8; margin-top: 4px; line-height: 1.4; }
+    .flow-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div>
+        <div class="title">FinSight — AWS Cloud Architecture Overview</div>
+        <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Zero-NAT Enterprise Cloud Topology • Region: AWS Mumbai (ap-south-1)</div>
+      </div>
+      <div class="badge">Production Ready</div>
+    </div>
+    <div class="grid">
+      <!-- Column 1: Client & Edge -->
+      <div class="tier">
+        <div class="tier-title"><span>🌐</span> 1. Edge & Delivery</div>
+        <div class="service-box accent-orange">
+          <div class="service-name">Amazon CloudFront <span class="service-badge">CDN</span></div>
+          <div class="service-desc">Global content delivery network caching React static assets with HTTPS TLS 1.3 encryption.</div>
+        </div>
+        <div class="service-box accent-orange">
+          <div class="service-name">AWS WAFv2 <span class="service-badge">Security</span></div>
+          <div class="service-desc">Protects against web exploits, OWASP Top 10 vulnerabilities, and applies strict rate limiting.</div>
+        </div>
+        <div class="service-box accent-orange">
+          <div class="service-name">Amazon S3 (SPA) <span class="service-badge">Storage</span></div>
+          <div class="service-desc">Hosts compiled Vite React single-page frontend assets with Origin Access Control (OAC).</div>
+        </div>
+      </div>
+
+      <!-- Column 2: Compute & Backend -->
+      <div class="tier">
+        <div class="tier-title"><span>⚡</span> 2. Compute & API</div>
+        <div class="service-box">
+          <div class="service-name">Application Load Balancer <span class="service-badge">ALB</span></div>
+          <div class="service-desc">Distributes incoming REST API traffic (/api/*) evenly across private container tasks.</div>
+        </div>
+        <div class="service-box">
+          <div class="service-name">AWS ECS Fargate <span class="service-badge">Serverless</span></div>
+          <div class="service-desc">Runs containerized Node.js 20 backend microservices with automatic scaling & zero server maintenance.</div>
+        </div>
+        <div class="service-box">
+          <div class="service-name">AWS VPC Endpoints <span class="service-badge">Zero-NAT</span></div>
+          <div class="service-desc">Private endpoints connecting ECS to AWS services without costly NAT gateways (~70% cost savings).</div>
+        </div>
+      </div>
+
+      <!-- Column 3: Data & AI Services -->
+      <div class="tier">
+        <div class="tier-title"><span>🧠</span> 3. Data & AI Services</div>
+        <div class="service-box accent-purple">
+          <div class="service-name">Amazon DynamoDB <span class="service-badge">Database</span></div>
+          <div class="service-desc">Single-table NoSQL store for ultra-fast user sessions, audit logs, and recurring templates.</div>
+        </div>
+        <div class="service-box accent-green">
+          <div class="service-name">Amazon Textract <span class="service-badge">AI OCR</span></div>
+          <div class="service-desc">AnalyzeExpense AI engine extracts itemized line items, totals, and taxes from receipt photos.</div>
+        </div>
+        <div class="service-box accent-purple">
+          <div class="service-name">Amazon Bedrock <span class="service-badge">GenAI</span></div>
+          <div class="service-desc">Titan Express LLM normalizes noisy merchant names and categorizes natural language expenses.</div>
+        </div>
+        <div class="service-box accent-green">
+          <div class="service-name">Amazon SES & SQS <span class="service-badge">Async</span></div>
+          <div class="service-desc">Asynchronous event queues and automated email delivery for bill alerts & split invites.</div>
+        </div>
+      </div>
+    </div>
+    <div class="flow-footer">
+      <div>🔒 Security: AWS KMS Encrypted at rest • Least-Privilege IAM Execution & Task Roles</div>
+      <div>Designed for: FinSight Academic & Capstone Presentation</div>
+    </div>
+  </div>
+</body>
+</html>
